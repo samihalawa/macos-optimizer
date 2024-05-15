@@ -1,4 +1,6 @@
-# macOS Optimizer: Fine-Tuning Your Mac for Peak Performance
+
+# macOS Optimizer: Fine-Tuning Your Mac for Peak Performance 
+
 <img width="100%" alt="截屏2024-05-15 下午4 18 24" src="https://github.com/samihalawa/mac-megaoptimizer/assets/3243470/77941cba-e4dd-4b42-9092-7cc82d1ce046">
 
 
@@ -18,19 +20,35 @@ These scripts cover a wide range of optimizations, including:
 
 <img width="100%" alt="截屏2024-05-15 下午4 27 03" src="https://github.com/samihalawa/macos-optimizer/assets/3243470/572a7853-4752-4072-bd1d-bbec231ebcb2">
 
-
 ## How to Use It
 
-Getting started with macOS Optimizer is easy:
+To get started, simply open Terminal and run the following commands:
 
-1. Clone or download the repository to your Mac.
-2. Navigate to the directory containing the scripts in Terminal.
-3. Run the script using `./macos_optimizer.sh` (or `sh macos_optimizer.sh` for older Macs).
-4. Follow the on-screen prompts to select and apply the optimizations that best suit your needs.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/samihalawa/macos-optimizer.git
+   ```
+
+2. Navigate to the repository directory:
+   ```bash
+   cd macos-optimizer
+   ```
+
+3. Make the script executable:
+   ```bash
+   chmod +x macos_optimizer.sh
+   ```
+
+4. Run the script:
+   ```bash
+   ./macos_optimizer.sh
+   ```
+
+Follow the on-screen prompts to select and apply the optimizations that best suit your needs.
 
 ## Collaboration and Contribution
 
-macOS Optimizer is an open-source project, and we welcome contributions from the community:
+macOS Optimizer is an open-source project, and contributions are welcome:
 
 - **Bug Reports**: If you encounter any issues or unexpected behavior, please open an issue on GitHub with detailed information.
 - **Feature Requests**: Have an idea for a new optimization or improvement? Let us know by opening an issue and sharing your thoughts.
