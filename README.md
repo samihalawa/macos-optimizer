@@ -15,6 +15,10 @@ These scripts cover a wide range of optimizations, including:
 - **Network Optimization**: Fine-tune network settings for faster and more reliable connectivity.
 - **Performance Enhancements**: Make tweaks to improve overall system responsiveness and speed.
 
+
+<img width="100%" alt="截屏2024-05-15 下午4 27 03" src="https://github.com/samihalawa/macos-optimizer/assets/3243470/572a7853-4752-4072-bd1d-bbec231ebcb2">
+
+
 ## How to Use It
 
 Getting started with macOS Optimizer is easy:
