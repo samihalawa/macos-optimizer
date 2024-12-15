@@ -1,0 +1,178 @@
+
+samihalawa@mac git % gh repo clone samihalawa/macos-optimizer macos-optimizer1
+Cloning into 'macos-optimizer1'...
+remote: Enumerating objects: 28, done.
+remote: Counting objects: 100% (28/28), done.
+remote: Compressing objects: 100% (28/28), done.
+remote: Total 28 (delta 8), reused 0 (delta 0), pack-reused 0 (from 0)
+Receiving objects: 100% (28/28), 29.27 KiB | 651.00 KiB/s, done.
+Resolving deltas: 100% (8/8), done.
+samihalawa@mac git % cd macos-optimizer1/
+samihalawa@mac macos-optimizer1 % ls
+LICENSE		README-ZH.md	README.md	README_es.md	script.sh
+samihalawa@mac macos-optimizer1 % chmod +x script.sh         
+samihalawa@mac macos-optimizer1 % ./
+zsh: permission denied: ./
+samihalawa@mac macos-optimizer1 % ./script.sh       
+============================================================
+macOS Optimizer: System Tweaks for Performance and Security
+============================================================
+Script Overview:
+  • Applies targeted system tweaks to optimize Mac configuration
+  • Disables vulnerable features and optimizes power management
+  • Reduces resource waste and improves overall system performance
+Important Notes:
+  • No changes will be made without your explicit confirmation
+  • Create a backup before running this script to ensure data safety
+Open-Source Project:
+View and contribute to the project at https://github.com/samihalawa/mac-megaoptimizer
+
+SYSTEM INFORMATION:
+Hostname: mac.local
+Operating System: macOS 15.2
+Kernel Version: 24.2.0
+Processor: Intel(R) Core(TM) i9-9880H CPU @ 2.30GHz
+Memory: 64 GB
+Storage: 3.6Ti total, 11Gi used, 11Gi available
+------------------------------------------------------------
+
+============================================================
+Choose an option:
+============================================================
+1. Disable Spotlight indexing - Boosts performance by reducing disk usage and CPU load | May take a few seconds longer to find files initially
+2. Disable sleepimage - Saves disk space and reduces boot time | Sleep recovery might take 1-2 seconds longer
+3. Disable App Nap - Improves app responsiveness and reduces CPU usage | Might increase energy consumption by 1-2%
+4. Disable automatic termination of inactive apps - Keeps apps ready and reduces launch time | May increase memory usage by 50-100MB
+5. Enable continuous disk checking - Maintains disk health and prevents data loss | May cause brief system slowdowns (1-2% CPU usage) when running
+6. Enable TRIM (requires restart) - Improves SSD lifespan and performance | System will restart after enabling
+7. Enable lid wake - Instant wake from sleep and reduces power consumption | No significant downside
+8. Optimize swap usage - Better performance and reduces disk usage | Higher memory use in some scenarios (1-2GB)
+9. Disable sudden motion sensor - Avoids HDD interruptions and reduces power consumption | Decreased data protection if dropped (1-2% risk)
+10. Disable hibernation and sleep - Immediate access and reduces power consumption | Higher power consumption when inactive (1-2W)
+11. Flush the DNS cache - Resolves networking issues and improves browsing speed | Temporary network slowdown (2-3 seconds)
+12. Optimize Spotlight for faster searches - Quicker searches and reduces CPU usage | Initial slowdown (1-2 minutes)
+13. Disable Dashboard - Frees up resources and reduces CPU usage | Loses Dashboard widgets
+14. Disable animations - Faster UI responsiveness and reduces CPU usage | Less visual appeal
+15. Disable local Time Machine snapshots - More free disk space and reduces CPU usage | No local backups
+16. Enable Secure Empty Trash - Secure deletion and reduces disk usage | Slower deletion process (1-2 seconds longer)
+17. Clear font caches - Fixes font issues and reduces CPU usage | Temporary app slowdowns (1-2 seconds)
+18. Add command to remove.DS_Store files from new folders - Cleans folder views and reduces disk usage | No downsides
+19. Optimize network settings - Faster network response and reduces CPU usage | May take a few seconds longer initially
+20. Optimize system performance - Enhances overall speed and reduces CPU usage | May take a few seconds longer initially
+21. Disable Bluetooth when not in use - Saves battery life and reduces power consumption | No significant downside
+22. Enable TRIM - Improves SSD lifespan and performance | System will restart after enabling
+23. RUN ONLY SAFE OPTIMIZATIONS (1,3,4,5,6,7,11,12,16) - Balanced tuning | May take a few seconds longer
+24. RUN ALL OPTIMIZATIONS (except TRIM as requires restart) - Comprehensive tuning | May take a few seconds longer
+0. Quit
+Enter your choice: 24 
+Running all optimizations...
+Loading.....
+
+Optimizing network settings...
+Password:
+net.inet.tcp.delayed_ack: 3 -> 0
+net.inet.tcp.mssdflt: 512 -> 1440
+Success: Network settings optimized
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Optimizing system performance...
+kern.ipc.somaxconn: 128 -> 1024
+sysctl: oid 'kern.ipc.nmbclusters' is read only
+Error: System performance optimized
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+/:
+2024-12-15 10:35:14.178 mdutil[67516:492099] mdutil disabling Spotlight: / -> kMDConfigSearchLevelFSSearchOnly
+	Indexing disabled.
+/System/Volumes/Data:
+2024-12-15 10:35:14.279 mdutil[67516:492099] mdutil disabling Spotlight: /System/Volumes/Data -> kMDConfigSearchLevelFSSearchOnly
+
+	Indexing disabled.
+/System/Volumes/Preboot:
+2024-12-15 10:35:26.572 mdutil[67516:492099] mdutil disabling Spotlight: /System/Volumes/Preboot -> kMDConfigSearchLevelFSSearchOnly
+	Indexing disabled.
+Success: Spotlight indexing disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: Sleepimage disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: App Nap disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: Automatic termination of inactive apps disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+warning: option -f is not implemented, ignoring
+error: container /dev/rdisk1 is mounted with write access.
+Error: Continuous disk checking enabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: Lid wake enabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+sysctl: unknown oid 'vm.swappiness'
+Error: Swap usage optimized
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: Sudden motion sensor disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: Hibernation and sleep disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: DNS cache flushed
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+/:
+2024-12-15 10:35:47.656 mdutil[67541:492766] mdutil disabling Spotlight: / -> kMDConfigSearchLevelFSSearchOnly
+	Indexing disabled.
+Success: Spotlight optimized for faster searches
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: Dashboard disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: Animations disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+disablelocal: Unrecognized verb.
+Error: Local Time Machine snapshots disabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Success: Secure Empty Trash enabled
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Removing: /var/folders/zz/zyxvpxvq6csfxvn_n00000c4000031/C/com.apple.FontRegistry
+2024-12-15 10:35:58.756 atsutil[67554:493153] Error: Error Domain=NSCocoaErrorDomain Code=4 "“com.apple.FontRegistry” couldn’t be removed." UserInfo={NSUserStringVariant=(
+    Remove
+), NSFilePath=/var/folders/zz/zyxvpxvq6csfxvn_n00000c4000031/C/com.apple.FontRegistry, NSURL=file:///var/folders/zz/zyxvpxvq6csfxvn_n00000c4000031/C/com.apple.FontRegistry, NSUnderlyingError=0x600002068060 {Error Domain=NSPOSIXErrorDomain Code=2 "No such file or directory"}}
+Removing: /var/folders/dd/7rkxy5bx7l14yrh280h1t8_h0000gn/C/com.apple.FontRegistry
+Success: Font caches cleared
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+Adding command to remove.DS_Store files from new folders
+/Users/samihalawa/.profile: line 7: find.: command not found
+Error: Command added to remove.DS_Store files
+Press ENTER to continue or 'q' to cancel and return to main menu...
+
+
+All optimizations complete!
