@@ -1783,7 +1783,7 @@ function run_remaining_optimizations() {
 function show_beautiful_menu() {
     while true; do
         clear
-        # Compact Logo with updated title
+        # Beautiful ASCII Logo
         echo -e "${CYAN}"
         echo "╔════════════════════════════════════════════════════════════╗"
         echo "║  ███╗   ███╗ █████╗  ██████╗ ██████╗ ███████╗            ║"
@@ -1796,7 +1796,7 @@ function show_beautiful_menu() {
         echo "╚════════════════════════════════════════════════════════════╝"
         echo -e "${DIM}github.com/samihalawa/macos-optimizer${NC}"
 
-        # Compact System Dashboard with fixed color codes
+        # System Status Dashboard
         echo -e "\n${DIM}╭─ System Status ─────────────────────────────────────────────╮"
         local cpu_usage=$(top -l 1 | grep "CPU usage" | cut -d: -f2 | cut -d',' -f1 | xargs)
         local mem_usage=$(memory_pressure | cut -d: -f2 | cut -d'%' -f1 | xargs)
@@ -1807,7 +1807,7 @@ function show_beautiful_menu() {
             "$(sw_vers -productVersion)" "$storage_free"
         echo -e "${DIM}╰──────────────────────────────────────────────────────────────╯${NC}"
 
-        # Menu with status indicators
+        # Menu Options
         echo -e "\n${BOLD}${PURPLE}Select Optimization:${NC} ${DIM}[↑/↓] Navigate  [Enter] Select  [Q] Quit${NC}\n"
         
         local options=(

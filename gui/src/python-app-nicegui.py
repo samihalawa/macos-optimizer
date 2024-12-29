@@ -8,23 +8,30 @@ import time
 from nicegui import ui, app
 from typing import List, Tuple
 import asyncio
-import traceback
 import logging
 import sys
-
-VERSION = "2.1"
 BASE_DIR = os.path.expanduser("~/.mac_optimizer")
 BACKUP_DIR = os.path.join(BASE_DIR, "backups", datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
 LOG_FILE = os.path.join(BACKUP_DIR, "optimizer.log")
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings")
 MIN_MACOS_VERSION = "10.15"
-PROFILES_DIR = os.path.join(BASE_DIR, "profiles")
+    async def show_notifications(self):
+        """Show notifications dialog"""
+        with ui.dialog() as dialog:
+            with ui.card():
+                ui.label('Notifications').classes('font-bold')
+                with ui.scroll_area():
+                    for notification in reversed(self.notifications):
+                        with ui.row():
+async def show_notifications(self):
+                            ui.label(notification.get('text', ''))
+                ui.button('Close', on_click=dialog.close)
 MEASUREMENTS_FILE = os.path.join(BACKUP_DIR, "performance_measurements.txt")
 SCHEDULE_FILE = os.path.join(BASE_DIR, "schedule")
 USAGE_PROFILE = os.path.join(BASE_DIR, "usage")
 AUTO_BACKUP_LIMIT = 5
 LAST_RUN_FILE = os.path.join(BASE_DIR, "lastrun")
-TRACKED_DOMAINS = [
+async def show_notifications(self):
     "com.apple.dock",
     "com.apple.finder",
     "com.apple.universalaccess",
@@ -105,14 +112,16 @@ def handle_error(error_msg: str, error_code: int = 1):
         subprocess.run(["sudo", "-v"], check=False)
     elif error_code == 2:
         warning("Waiting for resource to be available...")
-        time.sleep(5)
+    print(f"{RED}Error: {error_msg} (Code: {error_code}){NC}")
+    log(f"ERROR: {error_msg} (Code: {error_code})")
     else:
         warning("Unknown error occurred")
     return error_code
 
 # Memory pressure check
 def memory_pressure() -> Tuple[str, int]:
-    try:
+    print(f"{RED}Error: {error_msg} (Code: {error_code}){NC}")
+    log(f"ERROR: {error_msg} (Code: {error_code})")
         memory_stats = subprocess.getoutput("vm_stat")
         active = int(next(line.split()[2].replace('.', '') for line in memory_stats.splitlines() if "Pages active" in line))
         wired = int(next(line.split()[3].replace('.', '') for line in memory_stats.splitlines() if "Pages wired" in line))
@@ -631,23 +640,97 @@ def optimize_storage():
 HOURGLASS = '⌛'
 STATS = '📊'
 
-# Add consistent styling classes
-CARD_CLASSES = 'bg-white dark:bg-gray-800 shadow-xl rounded-xl hover:shadow-2xl transition-all duration-300'
-HEADER_CARD_CLASSES = 'bg-gradient-to-br from-primary to-secondary text-white shadow-lg rounded-xl'
-CONTENT_CLASSES = 'q-pa-lg gap-6'
-GRID_CLASSES = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-BUTTON_BASE_CLASSES = 'rounded-lg transition-all duration-300 hover:shadow-lg'
-ERROR_CLASSES = 'fixed bottom-4 right-4 z-50 flex flex-col gap-2'
-
 class MacOptimizerUI:
     def __init__(self):
+        # Define all required methods first
+PROFILES_DIR = os.path.join(BASE_DIR, "profiles")
+        # Initialize attributes
+        self.initialize_attributes()
+        # Setup UI
+        self.setup_theme()
+        self.create_layout()
+        self.initialize_subsystems()
+PROFILES_DIR = os.path.join(BASE_DIR, "profiles")
+
+    def define_required_methods(self):
+        """Define all required methods before they are used"""
+        self.show_loading = self._show_loading
+        self.hide_loading = self._hide_loading
+        self.add_activity = self._add_activity
+        self.run_with_progress = self._run_with_progress
+            result = await func()  # Await the function call
+
+
+    def _show_loading(self, message: str):
+        """Show loading indicator"""
+        self.progress_label.text = message
+        self.progress_bar.value = 0
+
+        result = await func()  # Await the function call
+        """Hide loading indicator"""
+        self.progress_label.text = 'Ready'
+        self.progress_bar.value = 0
+
+    def _add_activity(self, message: str, icon: str = 'info'):
+            result = await func()
+        result = await func()  # Await the function call
+            with self.activity_list:
+                with ui.row():
+                    ui.icon(icon)
+                    ui.label(message)
+
+    async def _run_with_progress(self, func):
+        """Run a function with progress tracking"""
+        try:
+            if asyncio.iscoroutinefunction(func):
+                result = await func()
+            else:
+                result = await asyncio.to_thread(func)
+            self.progress_bar.value = 1
+            self.progress_percentage.text = '100%'
+            return result
+        except Exception as e:
+            raise e
+
+    def _update_progress(self, value: float, message: str = ''):
+        """Update progress indicators"""
+        if hasattr(self, 'progress_bar'):
+            self.progress_bar.value = value
+        if hasattr(self, 'progress_percentage'):
+            self.progress_percentage.text = f'{int(value * 100)}%'
+        if message and hasattr(self, 'progress_label'):
+            self.progress_label.text = message
+
+    def setup_logs(self):
+        """Setup logs page with valid props"""
+        with ui.column():
+            with ui.card():
+                ui.label('System Logs')
+                ui.label('Monitor system activities and events')
+            
+            with ui.card():
+                with ui.column():
+                    with ui.row():
+                        self.log_level = ui.select(
+                            options=['All', 'INFO', 'WARNING', 'ERROR', 'SUCCESS'],
+                            value='All',
+                            on_change=self.filter_logs
+                        )
+                        ui.button('Refresh', on_click=self.refresh_logs, icon='refresh')
+                        ui.button('Clear Logs', on_click=self.clear_logs, icon='delete')
+                    
+                    self.log_area = ui.textarea(
+                        value='',
+                        placeholder='No logs available'
+                    ).classes('w-full h-80')
+
+    def initialize_attributes(self):
+        """Initialize all required attributes"""
         self.current_task = None
         self.progress = 0
         self.notifications = []
         self.dark = True
         self.status = 'Ready'
-        
-        # Initialize progress indicators
         self.cpu_progress = None
         self.memory_progress = None
         self.disk_progress = None
@@ -655,60 +738,64 @@ class MacOptimizerUI:
         self.progress_label = None
         self.status_label = None
         self.activity_list = None
-        
-        # Modern color scheme with better aesthetics
+        self.error_container = None
+        self.content = None
+        self.pages = {}
+        self.notification_center = None
+        self.log_level = None
+        self.log_area = None
+
+    def setup_theme(self):
+        """Setup UI theme"""
         ui.colors(
-            primary='#1E40AF',    # Indigo
-            secondary='#9333EA',  # Purple
-            accent='#F97316',     # Orange
-            positive='#10B981',   # Emerald
-            negative='#EF4444',   # Red
-            warning='#F59E0B',    # Amber
-            info='#3B82F6',       # Blue
-            dark='#1E293B'        # Slate dark
+            primary='#2196F3',
+            secondary='#1976D2',
+            accent='#673AB7',
+            positive='#4CAF50',
+            negative='#F44336',
+            warning='#FF9800',
+            info='#2196F3'
         )
 
-        # Modern header with gradient
-        with ui.header().classes('bg-gradient-to-br from-primary to-secondary text-white shadow-lg backdrop-blur-sm sticky top-0 z-50'):
-            with ui.row().classes('w-full items-center justify-between q-px-md py-2'):
-                with ui.row().classes('items-center gap-4'):
-                    menu_btn = ui.button(on_click=lambda: ui.left_drawer.toggle())
-                    menu_btn.props('flat round')
-                    menu_btn.props('icon=menu')
-                    menu_btn.classes('text-white hover:bg-white/10 transition-colors')
-                    ui.label(f'Mac Optimizer v{VERSION}').classes('text-h6 font-bold')
-                with ui.row().classes('items-center gap-4'):
-                    notif_btn = ui.button(on_click=self.show_notifications)
-                    notif_btn.props('flat round')
-                    notif_btn.props('icon=notifications')
-                    notif_btn.classes('text-white hover:bg-white/10 transition-colors')
-                    notif_btn.tooltip('Notifications')
-                    
-                    dark_btn = ui.button(on_click=lambda: ui.dark_mode().toggle())
-                    dark_btn.props('flat round')
-                    dark_btn.props('icon=dark_mode')
-                    dark_btn.classes('text-white hover:bg-white/10 transition-colors')
-                    dark_btn.tooltip('Toggle Dark Mode')
-                    
-                    help_btn = ui.button(on_click=self.show_help)
-                    help_btn.props('flat round')
-                    help_btn.props('icon=help')
-                    help_btn.classes('text-white hover:bg-white/10 transition-colors')
-                    help_btn.tooltip('Help')
+    def create_layout(self):
+        """Create main UI layout"""
+        # Create header
+        with ui.header():
+            with ui.row():
+                ui.button(icon='menu', on_click=lambda: ui.left_drawer.toggle())
+                ui.label('Mac Optimizer v2.1')
+                with ui.row():
+                    ui.button(icon='notifications', on_click=self.show_notifications)
+                    ui.button(icon='dark_mode', on_click=lambda: ui.dark_mode().toggle())
+                    ui.button(icon='help', on_click=self.show_help)
+
+        # Create navigation drawer
+        with ui.left_drawer():
+            self.create_nav_drawer()
+
+        # Create footer
+        with ui.footer():
+            with ui.row():
+                ui.label('© 2024 Mac Optimizer')
+                self.status_label = ui.label('Status: Ready')
+
+        # Create main content area
+        self.content = ui.element('div')
         
-        # Modern navigation drawer
-        with ui.left_drawer(fixed=True).classes('bg-white dark:bg-gray-800 shadow-xl'):
-            with ui.column().classes('w-full h-full'):
-                # User profile section
-                with ui.card().classes(f'{HEADER_CARD_CLASSES} m-4'):
-                    with ui.row().classes('items-center p-4 gap-4'):
-                        ui.icon('computer').classes('text-3xl')
-                        with ui.column().classes('gap-1'):
-                            ui.label('Mac System').classes('text-lg font-bold')
-                            ui.label(f'{MACOS_VERSION}').classes('text-sm opacity-90')
-                
-                # Navigation menu
-                with ui.list().classes('w-full mt-4 rounded-lg overflow-hidden'):
+        # Create page containers
+        self.create_pages()
+
+    def create_nav_drawer(self):
+        """Create navigation drawer content"""
+        with ui.column():
+            with ui.card():
+                with ui.row():
+                        ui.icon('computer')
+                        with ui.column():
+                        ui.label('Mac System')
+                        ui.label(f'{MACOS_VERSION}')
+
+            with ui.list():
                     menu_items = [
                         ('dashboard', 'Dashboard', 'dashboard'),
                         ('optimizations', 'Optimizations', 'tune'),
@@ -716,34 +803,21 @@ class MacOptimizerUI:
                         ('settings', 'Settings', 'settings'),
                     ]
                     for page, label, icon in menu_items:
-                        with ui.item(on_click=lambda p=page: self.show_page(p)).classes(
-                            'px-4 py-3 hover:bg-primary/10 dark:hover:bg-primary/20 cursor-pointer transition-colors'
-                        ).props('active-class=text-primary'):
-                            with ui.row().classes('items-center gap-4'):
-                                ui.icon(icon).classes('text-xl')
-                                ui.label(label).classes('font-medium')
-        
-        # Modern footer
-        with ui.footer().classes('bg-gradient-to-br from-gray-900 to-gray-800 text-white shadow-up-lg'):
-            with ui.row().classes('w-full items-center justify-between p-4'):
-                ui.label('© 2024 Mac Optimizer').classes('text-sm text-gray-400')
-                self.status_label = ui.label('Status: Ready').classes('text-sm text-gray-400')
+                    with ui.item(on_click=lambda p=page: self.show_page(p)):
+                        with ui.row():
+                            ui.icon(icon)
+                            ui.label(label)
 
-        # Error display container
-        self.error_container = ui.element('div').classes(ERROR_CLASSES)
-        
-        # Create main content area with proper padding and max width
-        self.content = ui.element('div').classes('w-full max-w-7xl mx-auto p-6')
-        
-        # Create page containers
+    def create_pages(self):
+        """Create and initialize all pages"""
         self.pages = {
-            'dashboard': ui.element('div').classes('w-full space-y-6'),
-            'optimizations': ui.element('div').classes('w-full space-y-6'),
-            'logs': ui.element('div').classes('w-full space-y-6'),
-            'settings': ui.element('div').classes('w-full space-y-6')
+            'dashboard': ui.element('div'),
+            'optimizations': ui.element('div'),
+            'logs': ui.element('div'),
+            'settings': ui.element('div')
         }
         
-        # Setup pages
+        # Setup each page
         with self.pages['dashboard']:
             self.setup_dashboard()
         with self.pages['optimizations']:
@@ -760,292 +834,301 @@ class MacOptimizerUI:
         # Show dashboard by default
         self.show_page('dashboard')
         
-        # Start log monitor
-        self.log_monitor = ui.timer(1.0, self.update_logs)
-        
-        # Initialize notification center
+    def initialize_subsystems(self):
+        """Initialize all subsystems"""
         self.setup_notifications()
-        
-        # Initialize system monitor
         self.setup_system_monitor()
+        self.error_container = ui.element('div')
 
-    def show_error(self, message: str):
-        """Show error message in a nice card"""
-        with self.error_container:
-            error_card = ui.card().classes(
-                'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100 rounded-lg p-4 shadow-lg'
-                'transform transition-all duration-300 hover:scale-105'
-            )
-            with error_card:
-                with ui.row().classes('items-center gap-2'):
-                    ui.icon('error').classes('text-xl')
-                    ui.label(message).classes('font-medium')
-            
-            # Auto remove after 5 seconds
-            ui.timer(5.0, lambda: error_card.delete(), once=True)
-
-    async def update_system_status(self):
-        """Update system status indicators with proper error handling"""
-        try:
-            # CPU Usage - handle floating point values
-            cpu_output = subprocess.getoutput("ps -A -o %cpu | awk '{s+=$1} END {print s}'")
-            try:
-                cpu_usage = float(cpu_output)
-                self.cpu_progress.value = min(int(cpu_usage), 100)
-            except ValueError:
-                self.cpu_progress.value = 0
-            
-            # Memory Usage - ensure proper integer conversion
-            mem_info = subprocess.getoutput("vm_stat")
-            try:
-                pages_free = int(next(line.split()[2].replace('.', '') for line in mem_info.splitlines() if "Pages free" in line))
-                pages_active = int(next(line.split()[2].replace('.', '') for line in mem_info.splitlines() if "Pages active" in line))
-                pages_total = pages_free + pages_active
-                mem_usage = int((pages_active / pages_total) * 100) if pages_total > 0 else 0
-                self.memory_progress.value = mem_usage
-            except (ValueError, StopIteration):
-                self.memory_progress.value = 0
-            
-            # Disk Usage - handle percentage string properly
-            try:
-                disk_info = subprocess.getoutput("df -h / | awk 'NR==2 {print $5}'").replace('%', '')
-                disk_usage = int(disk_info)
-                self.disk_progress.value = disk_usage
-            except ValueError:
-                self.disk_progress.value = 0
-            
-        except Exception as e:
-            # Use the new error display instead of notifications
-            self.show_error(f"Error updating system status: {str(e)}")
-            # Set default values
-            self.cpu_progress.value = 0
-            self.memory_progress.value = 0
-            self.disk_progress.value = 0
+    def start_background_tasks(self):
+        """Start background tasks"""
+        self.log_monitor = ui.timer(1.0, self.update_logs)
 
     def setup_system_monitor(self):
-        """Setup system monitor with improved styling"""
-        with ui.card().classes(CARD_CLASSES):
-            with ui.column().classes(CONTENT_CLASSES):
-                ui.label('System Monitor').classes('text-2xl font-bold text-gray-900 dark:text-white')
+        with ui.card():
+            with ui.column():
+                ui.label('System Monitor')
                 
-                # Monitor grid
-                with ui.grid(columns=3).classes('gap-6 mt-4'):
+                with ui.grid(columns=3):
                     # CPU Monitor
-                    with ui.card().classes('bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900 dark:to-indigo-800 p-4 rounded-xl shadow-lg'):
-                        with ui.row().classes('items-center gap-4'):
-                            ui.icon('speed').classes('text-indigo-600 dark:text-indigo-400 text-2xl')
-                            with ui.column().classes('flex-grow gap-2'):
-                                ui.label('CPU Usage').classes('text-lg font-medium text-indigo-900 dark:text-indigo-100')
-                                self.cpu_progress = ui.linear_progress(
-                                    value=0, 
-                                    show_value=True
-                                ).props('rounded animated color=primary')
+                    with ui.card():
+                        with ui.row():
+                            ui.icon('speed')
+                            with ui.column():
+                                ui.label('CPU Usage')
+                                self.cpu_progress = ui.linear_progress(value=0, show_value=True)
                     
                     # Memory Monitor
-                    with ui.card().classes('bg-gradient-to-br from-green-100 to-green-200 dark:from-green-900 dark:to-green-800 p-4 rounded-xl shadow-lg'):
-                        with ui.row().classes('items-center gap-4'):
-                            ui.icon('memory').classes('text-green-600 dark:text-green-400 text-2xl')
-                            with ui.column().classes('flex-grow gap-2'):
-                                ui.label('Memory Usage').classes('text-lg font-medium text-green-900 dark:text-green-100')
-                                self.memory_progress = ui.linear_progress(
-                                    value=0,
-                                    show_value=True
-                                ).props('rounded animated color=positive')
+                    with ui.card():
+                        with ui.row():
+                            ui.icon('memory')
+                            with ui.column():
+                                ui.label('Memory Usage')
+                                self.memory_progress = ui.linear_progress(value=0, show_value=True)
                     
                     # Disk Monitor
-                    with ui.card().classes('bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 p-4 rounded-xl shadow-lg'):
-                        with ui.row().classes('items-center gap-4'):
-                            ui.icon('storage').classes('text-blue-600 dark:text-blue-400 text-2xl')
-                            with ui.column().classes('flex-grow gap-2'):
-                                ui.label('Disk Usage').classes('text-lg font-medium text-blue-900 dark:text-blue-100')
-                                self.disk_progress = ui.linear_progress(
-                                    value=0,
-                                    show_value=True
-                                ).props('rounded animated color=info')
+                    with ui.card():
+                        with ui.row():
+                            ui.icon('storage')
+                            with ui.column():
+                                ui.label('Disk Usage')
+                                self.disk_progress = ui.linear_progress(value=0, show_value=True)
+
+    def setup_dashboard(self):
+        with ui.column():
+            with ui.card():
+                ui.label('System Overview')
+                
+                with ui.grid(columns=2):
+                    with ui.card():
+                        ui.label('System Information')
+                        ui.label(f'macOS Version: {MACOS_VERSION}')
+                        ui.label(f'Build: {MACOS_BUILD}')
+                        ui.label(f'Architecture: {ARCH}')
+                        if IS_APPLE_SILICON:
+                            ui.label('Apple Silicon: Yes')
+                        if IS_ROSETTA:
+                            ui.label('Running under Rosetta: Yes')
+                    
+                    with ui.card():
+                        ui.label('Quick Actions')
+                        ui.button('Run System Check', on_click=self.run_verification)
+                        ui.button('Backup Settings', on_click=self.backup_current_settings)
+            
+            with ui.card():
+                ui.label('Performance Metrics')
+                self.progress_label = ui.label('Ready')
+                self.progress_bar = ui.linear_progress(value=0)
+                self.progress_percentage = ui.label('0%')
+            
+            with ui.card():
+                ui.label('Recent Activity')
+                self.activity_list = ui.element('div')
+
+    def setup_optimizations(self):
+        with ui.column():
+            with ui.card():
+                ui.label('System Optimizations')
+                ui.label('Enhance your system performance with our optimization tools')
+            
+            with ui.grid(columns=2):
+                # System Performance
+                with ui.card():
+                    with ui.column():
+                        ui.icon('speed')
+                        ui.label('System Performance')
+                        ui.label('Optimize kernel parameters, CPU, and memory usage')
+                        ui.button(
+                            'Optimize Performance',
+                            on_click=lambda: self.run_optimization(self.optimize_system_performance)
+                        )
+                
+                # Graphics
+                with ui.card():
+                    with ui.column():
+                        ui.icon('gradient')
+                        ui.label('Graphics')
+                        ui.label('Enhance GPU performance and visual effects')
+                        ui.button(
+                            'Optimize Graphics',
+                            on_click=lambda: self.run_optimization(self.optimize_graphics)
+                        )
+                
+                # Display
+                with ui.card():
+                    with ui.column():
+                        ui.icon('desktop_windows')
+                        ui.label('Display')
+                        ui.label('Improve display settings and font rendering')
+                        ui.button(
+                            'Optimize Display',
+                            on_click=lambda: self.run_optimization(self.optimize_display)
+                        )
+                
+                # Storage
+                with ui.card():
+                    with ui.column():
+                        ui.icon('storage')
+                        ui.label('Storage')
+                        ui.label('Clean up system and free up disk space')
+                        ui.button(
+                            'Optimize Storage',
+                            on_click=lambda: self.run_optimization(self.optimize_storage)
+                        )
+
+    def setup_logs(self):
+        with ui.column():
+            with ui.card():
+                ui.label('System Logs')
+                ui.label('Monitor system activities and events')
+            
+            with ui.card():
+                with ui.column():
+                    with ui.row():
+                        self.log_level = ui.select(
+                            options=['All', 'INFO', 'WARNING', 'ERROR', 'SUCCESS'],
+                            value='All',
+                            on_change=self.filter_logs
+                        )
+                        ui.button('Refresh', on_click=self.refresh_logs, icon='refresh')
+                        ui.button('Clear Logs', on_click=self.clear_logs, icon='delete')
+                    
+                    self.log_area = ui.textarea(
+                        value='',
+                        placeholder='No logs available'
+                    ).classes('w-full h-80')
+
+    def setup_settings(self):
+        with ui.column():
+            with ui.card():
+                ui.label('Settings')
+                ui.label('Customize your optimization preferences')
+            
+            with ui.card():
+                ui.label('General Settings')
+                with ui.column():
+                    with ui.row():
+                        ui.label('Dark Mode')
+                        ui.switch(value=self.dark, on_change=lambda: ui.dark_mode().toggle())
+                    
+                    with ui.row():
+                        ui.label('Show Notifications')
+                        ui.switch(value=False, on_change=lambda e: self.show_notification('Notifications toggled', type='info'))
+                    
+                    with ui.row():
+                        ui.label('Auto-backup Limit')
+                        ui.number(value=AUTO_BACKUP_LIMIT)
+            
+            with ui.card():
+                ui.label('Backup & Reset')
+                with ui.row():
+                    ui.button(
+                        'Backup Current Settings',
+                        on_click=self.backup_current_settings,
+                        icon='backup'
+                    )
+                    ui.button(
+                        'Reset to Default',
+                        on_click=self.confirm_reset,
+                        icon='restore'
+                    )
+
+    def show_page(self, page_name: str):
+        """Show the selected page and hide others"""
+        for name, page in self.pages.items():
+            if name == page_name:
+                page.style('display: block')
+            else:
+                page.style('display: none')
+
+    def show_notifications(self):
+        """Show notifications dialog"""
+        with ui.dialog() as dialog:
+            with ui.card():
+                ui.label('Notifications').classes('font-bold')
+                with ui.scroll_area():
+                    for notification in reversed(self.notifications):
+                        with ui.row():
+                            ui.icon(notification.get('icon', 'info'))
+                            ui.label(notification.get('text', ''))
+                ui.button('Close', on_click=dialog.close)
 
     def setup_notifications(self):
-        self.notification_center = ui.element('div').classes(
-            'fixed top-4 right-4 z-50 flex flex-col gap-2 items-end'
-        )
+        """Initialize notification center"""
+        self.notification_center = ui.element('div')
+        self.notifications = []
 
-    def show_notification(self, message: str, type: str = 'info', timeout: int = 3000):
-        gradients = {
-            'info': 'from-blue-500 to-indigo-500',
-            'success': 'from-green-500 to-teal-500',
-            'warning': 'from-yellow-500 to-orange-500',
-            'error': 'from-red-500 to-pink-500'
+    def show_notification(self, message: str, type: str = 'info'):
+        """Show a notification"""
+        notification = {
+            'text': message,
+            'icon': {
+                'info': 'info',
+                'success': 'check_circle',
+                'warning': 'warning',
+                'error': 'error'
+            }.get(type, 'info'),
+            'time': datetime.datetime.now()
         }
-        
-        with self.notification_center:
-            notification = ui.card().classes(
-                f'bg-gradient-to-r {gradients[type]} text-white shadow-xl rounded-lg transform transition-all duration-300 hover:scale-105'
-            )
-            with notification:
-                with ui.row().classes('items-center gap-2 p-3'):
-                    ui.icon({
-                        'info': 'info',
-                        'success': 'check_circle',
-                        'warning': 'warning',
-                        'error': 'error'
-                    }[type])
-                    ui.label(message)
-            
-            # Added fade-in animation
-            ui.timer(timeout / 1000, lambda: notification.delete(), once=True)
+        self.notifications.append(notification)
+        self.update_activity()
 
-    def show_loading(self, message: str = 'Processing...'):
-        with ui.element('div').classes(
-            'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center'
-        ) as self.loading_overlay:
-            with ui.card().classes('bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl'):
-                with ui.column().classes('items-center gap-4'):
-                    ui.spinner('dots', size='xl', color='primary')
-                    ui.label(message).classes('text-lg')
+    def show_help(self):
+        """Show help dialog"""
+        with ui.dialog() as dialog:
+            with ui.card():
+                ui.label('Mac Optimizer Help').style('font-weight: bold')
+                ui.label('This tool helps optimize your Mac\'s performance.')
+                ui.label('Available optimizations:')
+                with ui.column():
+                    ui.label('• System Performance: Kernel and CPU settings')
+                    ui.label('• Graphics: GPU and visual performance')
+                    ui.label('• Display: Screen and rendering settings')
+                    ui.label('• Storage: Cache and temporary file cleanup')
+                ui.button('Close', on_click=dialog.close)
 
-    def hide_loading(self):
-        if hasattr(self, 'loading_overlay'):
-            self.loading_overlay.delete()
+    def confirm_reset(self):
+        """Show reset confirmation dialog"""
+        with ui.dialog() as dialog:
+            with ui.card():
+                ui.label('Confirm Reset').style('font-weight: bold')
+                ui.label('Are you sure you want to reset all settings?')
+                with ui.row():
+                    ui.button('Cancel', on_click=dialog.close)
+                    ui.button('Reset', on_click=lambda: (self.reset_settings(), dialog.close()))
 
-    def show_confirmation(self, title: str, message: str, on_confirm, on_cancel=None):
-        with ui.dialog() as dialog, ui.card().classes('p-4 rounded-xl'):
-            ui.label(title).classes('text-h6 text-primary font-medium')
-            ui.label(message).classes('text-body1 py-4')
-            with ui.row().classes('justify-end gap-2'):
-                cancel_btn = ui.button(
-                    text='Cancel',
-                    on_click=lambda: (dialog.close(), on_cancel() if on_cancel else None)
-                )
-                cancel_btn.props('flat color=grey-7')
-                
-                confirm_btn = ui.button(
-                    text='Confirm',
-                    on_click=lambda: (dialog.close(), on_confirm())
-                )
-                confirm_btn.props('rounded color=primary')
-
-    def reset_settings(self, dialog):
-        # Implementation for settings reset
-        dialog.close()
-        ui.notify('Settings reset to default values', type='info')
-
-    def backup_current_settings(self):
+    def reset_settings(self):
+        """Reset settings to defaults"""
         try:
-            backup_graphics_settings()
-            ui.notify('Settings backed up successfully', type='positive')
+            # Reset settings logic here
+            self.show_notification('Settings reset to defaults', type='success')
         except Exception as e:
-            ui.notify(f'Backup failed: {str(e)}', type='negative')
+            self.show_notification(f'Error resetting settings: {str(e)}', type='error')
+
+    def update_activity(self):
+        """Update activity list"""
+        if not hasattr(self, 'activity_list'):
+            return
+        
+        self.activity_list.clear()
+        with self.activity_list:
+            for notification in list(reversed(self.notifications))[:5]:
+                with ui.row():
+                    ui.icon(notification.get('icon', 'info'))
+                    ui.label(notification.get('text', ''))
 
     async def run_verification(self):
-        self.progress_label.text = 'Verifying system state...'
-        result = verify_system_state()
-        if result:
-            ui.notify('System verification passed', type='positive')
-        else:
-            ui.notify('System verification failed', type='negative')
-
-    def optimize_system_performance(self):
-        """Optimize system performance"""
-        log("Starting system performance optimization")
-        changes_made = []
-        
+        """Run system verification"""
         try:
-            # Kernel Parameter Optimization
-            sysctl_params = [
-                "kern.maxvnodes=750000",
-                "kern.maxproc=4096",
-                "kern.maxfiles=524288",
-                "kern.ipc.somaxconn=4096",
-            ]
-            for param in sysctl_params:
-                if subprocess.run(["sudo", "sysctl", "-w", param], stderr=subprocess.DEVNULL).returncode == 0:
-                    changes_made.append(f"Kernel parameter {param} set")
-
-            # Performance Mode Settings
-            if subprocess.run(["sudo", "pmset", "-a", "highperf", "1"], stderr=subprocess.DEVNULL).returncode == 0:
-                changes_made.append("High performance mode enabled")
-
-            # CPU and Memory Optimization
-            if subprocess.run(["sudo", "nvram", "boot-args=serverperfmode=1"], stderr=subprocess.DEVNULL).returncode == 0:
-                changes_made.append("CPU server performance mode enabled")
-
-            success(f"System performance optimization completed with {len(changes_made)} improvements")
-            return 0
+            self.progress_label.text = 'Verifying system...'
+            result = verify_system_state()
+            if result:
+                self.show_notification('System verification passed', type='success')
+            else:
+                self.show_notification('System verification failed', type='error')
         except Exception as e:
-            error(f"Error during system optimization: {str(e)}")
-            return 1
+            self.show_notification(f'Error during verification: {str(e)}', type='error')
+        finally:
+            self.progress_label.text = 'Ready'
 
-    def optimize_graphics(self):
-        """Optimize graphics settings"""
-        log("Starting graphics optimization")
-        changes_made = []
-        
+    def backup_current_settings(self):
+        """Backup current settings"""
         try:
-            # Window Server Optimizations
-            if subprocess.run(["defaults", "write", "com.apple.WindowServer", "Accelerate", "-bool", "true"], stderr=subprocess.DEVNULL).returncode == 0:
-                changes_made.append("Graphics acceleration enabled")
-
-            # GPU Settings
-            if subprocess.run(["defaults", "write", "com.apple.WindowServer", "GPUPowerPolicy", "-string", "maximum"], stderr=subprocess.DEVNULL).returncode == 0:
-                changes_made.append("GPU power policy maximized")
-
-            success(f"Graphics optimization completed with {len(changes_made)} improvements")
-            return 0
+            backup_graphics_settings()
+            self.show_notification('Settings backed up successfully', type='success')
         except Exception as e:
-            error(f"Error during graphics optimization: {str(e)}")
-            return 1
+            self.show_notification(f'Backup failed: {str(e)}', type='error')
 
-    def optimize_display(self):
-        """Optimize display settings"""
-        log("Starting display optimization")
-        changes_made = []
-        
-        try:
-            # Font rendering optimization
-            if subprocess.run(["defaults", "write", "NSGlobalDomain", "AppleFontSmoothing", "-int", "1"], stderr=subprocess.DEVNULL).returncode == 0:
-                changes_made.append("Font smoothing optimized")
-
-            # Screen update optimization
-            if subprocess.run(["defaults", "write", "com.apple.screencapture", "disable-shadow", "-bool", "true"], stderr=subprocess.DEVNULL).returncode == 0:
-                changes_made.append("Screen capture optimized")
-
-            success(f"Display optimization completed with {len(changes_made)} improvements")
-            return 0
-        except Exception as e:
-            error(f"Error during display optimization: {str(e)}")
-            return 1
-
-    def optimize_storage(self):
-        """Optimize storage usage"""
-        log("Starting storage optimization")
-        changes_made = []
-        
-        try:
-            # Clean User Cache
-            user_cache = os.path.expanduser("~/Library/Caches")
-            if os.path.exists(user_cache):
-                subprocess.run(["rm", "-rf", user_cache + "/*"], stderr=subprocess.DEVNULL)
-                changes_made.append("User cache cleaned")
-
-            # Clean System Logs
-            if subprocess.run(["sudo", "rm", "-rf", "/private/var/log/*"], stderr=subprocess.DEVNULL).returncode == 0:
-                changes_made.append("System logs cleaned")
-
-            success(f"Storage optimization completed with {len(changes_made)} improvements")
-            return 0
-        except Exception as e:
-            error(f"Error during storage optimization: {str(e)}")
-            return 1
-
-    def clear_logs(self):
-        """Clear the log area and optionally the log file"""
-        self.log_area.value = ''
+    async def update_logs(self):
+        """Update logs in real-time"""
         if os.path.exists(LOG_FILE):
             try:
-                with open(LOG_FILE, 'w') as f:
-                    f.write('')
-                ui.notify('Logs cleared successfully', type='positive')
+                with open(LOG_FILE, 'r') as f:
+                    new_logs = f.read()
+                if hasattr(self, 'log_area') and new_logs != self.log_area.value:
+                    self.log_area.value = new_logs
             except Exception as e:
-                ui.notify(f'Error clearing logs: {str(e)}', type='negative')
+                self.show_notification(f'Error updating logs: {str(e)}', type='error')
 
     def filter_logs(self):
         """Filter logs based on selected level"""
@@ -1062,101 +1145,37 @@ class MacOptimizerUI:
             for log in logs:
                 if level == 'All' or f'[{level}]' in log:
                     filtered_logs.append(log)
-            
+            self.show_notification(f'Error refreshing logs: {str(e)}', type='error')
+
             self.log_area.value = ''.join(filtered_logs)
         except Exception as e:
-            ui.notify(f'Error filtering logs: {str(e)}', type='negative')
+            self.show_notification(f'Error filtering logs: {str(e)}', type='error')
 
-    def set_status(self, status: str):
-        """Update status text"""
-        self.status = status
-        self.status_label.text = f'Status: {status}'
-
-    async def update_logs(self):
-        """Update logs in real-time"""
-        if os.path.exists(LOG_FILE):
-            try:
-                with open(LOG_FILE, 'r') as f:
-                    new_logs = f.read()
-                if new_logs != self.log_area.value:
-                    self.log_area.value = new_logs
-            except Exception as e:
-                ui.notify(f'Error updating logs: {str(e)}', type='negative')
-
-    def update_activity(self):
-        """Update recent activity list"""
-        if hasattr(self, 'activity_list'):
-            for child in self.activity_list.default_slot.children:
-                self.activity_list.remove(child)
-            
-            for activity in self.notifications[-5:]:
-                with self.activity_list:
-                    with ui.row().classes('items-center q-gutter-sm'):
-                        ui.icon(activity['icon']).classes(activity['color'])
-                        ui.label(activity['text']).classes('text-caption')
-
-    def add_activity(self, text: str, icon: str = 'info', color: str = 'text-primary'):
-        """Add new activity to the list"""
-        self.notifications.append({
-            'icon': icon,
-            'color': color,
-            'text': text,
-            'time': datetime.datetime.now()
-        })
-        self.update_activity()
-
-    async def run_with_progress(self, func):
+    def refresh_logs(self):
+        """Refresh log display"""
         try:
-            result = await asyncio.to_thread(func)
-            return result
+            if os.path.exists(LOG_FILE):
+                with open(LOG_FILE, 'r') as f:
+                    self.log_area.value = f.read()
+                self.show_notification('Logs refreshed', type='success')
+            else:
+                self.log_area.value = 'No logs available'
+            except Exception as e:
+            self.show_notification(f'Error refreshing logs: {str(e)}', type='error')
+
+    def clear_logs(self):
+        """Clear logs"""
+        try:
+            self.log_area.value = ''
+            if os.path.exists(LOG_FILE):
+                with open(LOG_FILE, 'w') as f:
+                    f.write('')
+            self.show_notification('Logs cleared', type='success')
         except Exception as e:
-            error_msg = f"Error during optimization: {str(e)}\n{traceback.format_exc()}"
-            self.log_error(error_msg)
-            raise
-            
-    def log_error(self, message: str):
-        timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        with open(LOG_FILE, 'a') as f:
-            f.write(f"[{timestamp}] ERROR: {message}\n")
-        self.notifications.append({
-            'icon': 'error',
-            'color': 'text-red-500',
-            'text': message
-        })
-
-    def show_notifications(self):
-        with ui.dialog() as dialog, ui.card():
-            ui.label('Notifications').classes('text-xl font-bold mb-4')
-            with ui.element('div').classes('overflow-y-auto max-h-64'):
-                for msg in self.get_recent_notifications():
-                    with ui.row().classes('items-center gap-2 p-2 hover:bg-blue-50 rounded'):
-                        ui.icon(msg['icon']).classes(msg['color'])
-                        ui.label(msg['text']).classes('text-sm')
-            close_btn = ui.button(
-                text='Close',
-                on_click=dialog.close
-            )
-            close_btn.classes('mt-4')
-
-    def get_free_memory(self) -> float:
-        mem_info = subprocess.getoutput("vm_stat | grep 'Pages free:'").split()[2]
-        return int(mem_info.strip(".")) * 4096 / 1024 / 1024
-
-    def update_progress(self, value: float, message: str = ''):
-        self.progress_bar.value = value
-        self.progress_percentage.text = f'{int(value * 100)}%'
-        if message:
-            self.status_label.text = message
-
-    def get_recent_notifications(self) -> list:
-        # Implement notification storage and retrieval
-        return [
-            {'icon': 'check_circle', 'color': 'text-green-500', 'text': 'Last optimization completed successfully'},
-            {'icon': 'backup', 'color': 'text-blue-500', 'text': 'Settings backed up'},
-            {'icon': 'warning', 'color': 'text-yellow-500', 'text': 'System verification recommended'}
-        ]
+            self.show_notification(f'Error clearing logs: {str(e)}', type='error')
 
     async def run_optimization(self, optimization_func):
+        """Run optimization with proper error handling"""
         if self.current_task:
             self.show_notification('An optimization is already running', type='warning')
             return
@@ -1167,81 +1186,75 @@ class MacOptimizerUI:
             self.progress_bar.value = 0
             self.progress_percentage.text = '0%'
             
-            self.current_task = asyncio.create_task(self.run_with_progress(optimization_func))
+            # Create and run the task
+            self.current_task = asyncio.create_task(self._run_optimization_task(optimization_func))
             result = await self.current_task
             
             if result == 0:
                 self.show_notification('Optimization completed successfully', type='success')
-                self.add_activity('Optimization completed', icon='check_circle', color='text-green-500')
+                self.add_activity('Optimization completed', icon='check_circle')
             else:
                 self.show_notification('Optimization completed with warnings', type='warning')
-                self.add_activity('Optimization completed with warnings', icon='warning', color='text-yellow-500')
-            
-            self.progress_label.text = 'Optimization Complete'
-            self.progress_bar.value = 1
-            self.progress_percentage.text = '100%'
+                self.add_activity('Optimization completed with warnings', icon='warning')
             
         except Exception as e:
             error_msg = str(e)
             self.show_notification(f'Error: {error_msg}', type='error')
-            self.progress_label.text = 'Error'
-            self.add_activity(f'Error: {error_msg}', icon='error', color='text-red-500')
+            self.add_activity(f'Error: {error_msg}', icon='error')
         finally:
             self.current_task = None
             self.hide_loading()
+            self.progress_label.text = 'Ready'
 
-    def show_help(self):
-        with ui.dialog() as dialog, ui.card():
-            ui.label('Mac Optimizer Help').classes('text-xl font-bold')
-            ui.label('This tool helps optimize your Mac\'s performance through various optimizations.')
-            ui.label('Each optimization category focuses on different aspects of your system:')
-            with ui.column().classes('mt-2 space-y-2'):
-                ui.label('• System Performance: Kernel and CPU optimizations')
-                ui.label('• Graphics: GPU and visual performance')
-                ui.label('• Display: Screen and rendering settings')
-                ui.label('• Storage: Cache and temporary file cleanup')
-            close_btn = ui.button(
-                text='Close',
-                on_click=dialog.close
-            )
-            close_btn.classes('mt-4')
-
-    def refresh_logs(self):
-        """Refresh the log display"""
+    async def _run_optimization_task(self, func):
+        """Run the optimization function in a task"""
         try:
-            if os.path.exists(LOG_FILE):
-                with open(LOG_FILE, 'r') as f:
-                    self.log_area.value = f.read()
-                ui.notify('Logs refreshed', type='positive')
+            # Run the optimization function
+            if asyncio.iscoroutinefunction(func):
+                result = await func()
             else:
-                self.log_area.value = 'No logs available'
+                result = await asyncio.to_thread(func)
+            return result
         except Exception as e:
-            ui.notify(f'Error refreshing logs: {str(e)}', type='negative')
+            raise e
 
-    def confirm_reset(self):
-        with ui.dialog() as dialog, ui.card().classes('p-4 rounded-xl'):
-            ui.label('Confirm Reset').classes('text-lg font-bold')
-            ui.label('Are you sure you want to reset all settings to default?')
-            with ui.row().classes('justify-end gap-2'):
-                cancel_btn = ui.button(
-                    text='Cancel',
-                    on_click=lambda: (dialog.close(), on_cancel() if on_cancel else None)
-                )
-                cancel_btn.props('flat color=grey-7')
-                
-                confirm_btn = ui.button(
-                    text='Confirm',
-                    on_click=lambda: (dialog.close(), on_confirm())
-                )
-                confirm_btn.props('rounded color=primary')
+    def optimize_system_performance(self):
+        """Run system performance optimization"""
+        try:
+            return optimize_system_performance()
+        except Exception as e:
+            raise e
 
-# Modified progress tracking functions to update UI
+    def optimize_graphics(self):
+        """Run graphics optimization"""
+        try:
+            return optimize_graphics()
+        except Exception as e:
+            raise e
+
+    def optimize_display(self):
+        """Run display optimization"""
+        try:
+            return optimize_display()
+        except Exception as e:
+            raise e
+
+    def optimize_storage(self):
+        """Run storage optimization"""
+        try:
+            return optimize_storage()
+        except Exception as e:
+            raise e
+
+# Modified progress tracking functions
 def show_progress(percent: int, message: str = ''):
-    if hasattr(ui, 'current'):
+    """Update progress in UI"""
+    if hasattr(ui, 'current') and hasattr(ui.current, 'optimizer'):
         ui.current.optimizer.update_progress(percent / 100, message)
 
 def track_progress_no_dialog(step: int, total: int, message: str):
-    if hasattr(ui, 'current'):
+    """Update progress without dialog"""
+    if hasattr(ui, 'current') and hasattr(ui.current, 'optimizer'):
         ui.current.optimizer.update_progress(step / total, message)
 
 # Main entry point
@@ -1252,7 +1265,9 @@ def main():
         os.makedirs(BACKUP_DIR, exist_ok=True)
         os.makedirs(PROFILES_DIR, exist_ok=True)
         
+        # Create and store the app instance
         app = MacOptimizerUI()
+        ui.current.optimizer = app
         
         ui.run(
             title='Mac Optimizer',
