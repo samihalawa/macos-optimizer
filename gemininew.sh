@@ -3,13 +3,12 @@
 # Licensed under the MIT License (see LICENSE file for details)
 
 # Exit immediately if a command exits with a non-zero status
-set +e
+set -e
 
-# Constants and Configuration
+# --- Constants and Configuration ---
 readonly VERSION="2.1"
 readonly BASE_DIR="$HOME/.mac_optimizer"
 readonly BACKUP_DIR="$BASE_DIR/backups/$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$BACKUP_DIR"
 readonly LOG_FILE="$BACKUP_DIR/optimizer.log"
 readonly SETTINGS_FILE="$BASE_DIR/settings"
 readonly MIN_MACOS_VERSION="10.15" # Minimum supported macOS version (Catalina)
@@ -19,6 +18,8 @@ readonly SCHEDULE_FILE="$BASE_DIR/schedule"
 readonly USAGE_PROFILE="$BASE_DIR/usage"
 readonly AUTO_BACKUP_LIMIT=5
 readonly LAST_RUN_FILE="$BASE_DIR/lastrun"
+readonly DIALOG_HEIGHT=20
+readonly DIALOG_WIDTH=70
 readonly TRACKED_DOMAINS=(
     "com.apple.dock"
     "com.apple.finder"
@@ -27,10 +28,13 @@ readonly TRACKED_DOMAINS=(
     "com.apple.QuickLookUI"
     "NSGlobalDomain"
 )
+
+# Verify if system_profiler is installed
 if ! command -v system_profiler &> /dev/null; then
     echo "system_profiler command not found. This script requires macOS." >&2
     exit 1
 fi
+
 readonly GPU_INFO=$(system_profiler SPDisplaysDataType 2>/dev/null || echo "")
 
 # Constants for special characters
@@ -70,7 +74,53 @@ elif [[ "$ARCH" == "x86_64" ]]; then
     fi
 fi
 
-# Enhanced error handling and logging
+# --- Enhanced Logging Functions ---
+# `enhanced_logging` - Logs the message with timestamp and severity to a log file
+function enhanced_logging() {
+    local log_dir=$(dirname "$LOG_FILE")
+    mkdir -p "$log_dir"
+    
+    if [[ -f "$LOG_FILE" && $(stat -f%z "$LOG_FILE") -gt 1048576 ]]; then
+        mv "$LOG_FILE" "$LOG_FILE.old"
+    fi
+    
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local severity=$1
+    local message=$2
+    
+    echo "[$timestamp][$severity] $message" >> "$LOG_FILE"
+}
+
+# `log` - Logs a message as info
+function log() {
+    local message=$1
+    enhanced_logging "INFO" "$message"
+    echo -e "${GRAY}[INFO] $message${NC}"
+}
+
+# `error` - Logs a message as error
+function error() {
+    local message=$1
+    enhanced_logging "ERROR" "$message"
+    echo -e "${RED}[ERROR] $message${NC}"
+}
+
+# `warning` - Logs a message as warning
+function warning() {
+    local message=$1
+    enhanced_logging "WARNING" "$message"
+    echo -e "${YELLOW}[WARNING] $message${NC}"
+}
+
+# `success` - Logs a message as success
+function success() {
+    local message=$1
+    enhanced_logging "SUCCESS" "$message"
+    echo -e "${GREEN}[SUCCESS] $message${NC}"
+}
+
+# --- Error Handling ---
+# `handle_error` - Handles an error, logs it, and potentially tries to resolve it
 function handle_error() {
     local error_msg=$1
     local error_code=${2:-1}
@@ -95,47 +145,8 @@ function handle_error() {
     return $error_code
 }
 
-function enhanced_logging() {
-    local log_dir=$(dirname "$LOG_FILE")
-    mkdir -p "$log_dir"
-    
-    if [[ -f "$LOG_FILE" && $(stat -f%z "$LOG_FILE") -gt 1048576 ]]; then
-        mv "$LOG_FILE" "$LOG_FILE.old"
-    fi
-    
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
-    local severity=$1
-    local message=$2
-    
-    echo "[$timestamp][$severity] $message" >> "$LOG_FILE"
-}
-
-# Add missing log, warning, error, and success functions
-function log() {
-    local message=$1
-    enhanced_logging "INFO" "$message"
-    echo -e "${GRAY}[INFO] $message${NC}"
-}
-
-function error() {
-    local message=$1
-    enhanced_logging "ERROR" "$message"
-    echo -e "${RED}[ERROR] $message${NC}"
-}
-
-function warning() {
-    local message=$1
-    enhanced_logging "WARNING" "$message"
-    echo -e "${YELLOW}[WARNING] $message${NC}"
-}
-
-function success() {
-    local message=$1
-    enhanced_logging "SUCCESS" "$message"
-    echo -e "${GREEN}[SUCCESS] $message${NC}"
-}
-
-# Memory pressure check function
+# --- System State Verification ---
+# `memory_pressure` - Reports system memory pressure percentage
 function memory_pressure() {
     local memory_stats=$(vm_stat)
     local active=$(echo "$memory_stats" | awk '/Pages active/ {print $3}' | tr -d '.')
@@ -155,12 +166,12 @@ function memory_pressure() {
     return 0
 }
 
-# System state verification
+# `verify_system_state` - Performs various system state checks
 function verify_system_state() {
     local checks_passed=true
     local issues=()
     
-    # Fix disk verification to handle mounted volumes
+    # Disk verification
     echo -ne "Checking disk health..."
     if ! diskutil verifyVolume / >/dev/null 2>&1; then
         warning "Disk verification skipped - volume is mounted"
@@ -169,7 +180,7 @@ function verify_system_state() {
         echo -e " ${GREEN}✓${NC}"
     fi
 
-    # Fix memory check to handle invalid values
+    # Memory check
     echo -ne "Checking memory pressure..."
     local mem_pressure
     mem_pressure=$(memory_pressure | grep -o "[0-9]*$" || echo "0")
@@ -181,7 +192,7 @@ function verify_system_state() {
         echo -e " ${GREEN}✓${NC}"
     fi
 
-    # Fix CPU thermal check to handle missing sysctl
+    # CPU thermal check
     echo -ne "Checking CPU temperature..."
     if ! sysctl machdep.xcpm.cpu_thermal_level >/dev/null 2>&1; then
         echo -e " ${YELLOW}⚠${NC} (Not available)"
@@ -196,7 +207,8 @@ function verify_system_state() {
     return $((checks_passed == false))
 }
 
-# Version comparison function
+# --- Version Comparison Function ---
+# `version_compare` - Compares two version strings
 function version_compare() {
     local v1=$1
     local v2=$2
@@ -220,7 +232,8 @@ function version_compare() {
     return 0    # versions are equal
 }
 
-# Enhanced cleanup function
+# --- Cleanup Functions ---
+# `cleanup` - Performs cleanup tasks (temp files, process termination, etc.)
 function cleanup() {
     tput cnorm 2>/dev/null || true # Show cursor, handle failure
     echo -e "\n${GRAY}Cleaning up...${NC}"
@@ -247,15 +260,9 @@ function cleanup() {
     fi
 }
 
-# Enhanced system validation
+# --- System Validation ---
+# `check_system_requirements` - Checks if the system meets minimum requirements
 function check_system_requirements() {
-    # Remove sudo check since it causes issues
-    # if [[ $EUID -ne 0 ]]; then
-    #     error "This script must be run with sudo privileges"
-    #     exit 1
-    # fi
-
-    # Get the detected version and normalize it for comparison
     local detected_version=$(sw_vers -productVersion)
     local major_version=$(echo "$detected_version" | cut -d. -f1)
     
@@ -268,7 +275,8 @@ function check_system_requirements() {
     exit 1
 }
 
-# Enhanced progress bar with spinner
+# --- Progress Indicators ---
+# `show_progress_bar` - Displays an animated progress bar with a spinner
 function show_progress_bar() {
     local current=$1
     local total=$2
@@ -297,7 +305,7 @@ function show_progress_bar() {
     fi
 }
 
-# Update the track_progress function to use the new progress bar
+# `track_progress` - Updates a dialog gauge for progress tracking
 function track_progress() {
     local current=$1
     local total=$2
@@ -311,7 +319,7 @@ function track_progress() {
                           8 70 0
 }
 
-# Add a spinner for operations without clear progress
+# `show_spinner` - Displays a spinner while an operation is running
 function show_spinner() {
     local message=$1
     local pid=$2
@@ -328,7 +336,25 @@ function show_spinner() {
     printf "${GREEN}✓${NC} %s... Done\n" "$message"
 }
 
-# Update optimize_system_performance to use the new progress indicators
+# `show_progress` - Shows a progress indicator
+function show_progress() {
+    local current=$1
+    local total=$2
+    local width=20  # Reduced width for more compact display
+    local percentage=$((current * 100 / total))
+    local filled=$((width * current / total))
+    local empty=$((width - filled))
+    tput cr
+    printf "  ${GRAY}[${GREEN}"
+    printf "█%.0s" $(seq 1 $filled)
+    printf "${GRAY}"
+    printf "░%.0s" $(seq 1 $empty)
+    printf "] ${BOLD}%3d%%${NC}" $percentage
+    tput el
+}
+
+# --- Optimization Functions ---
+# `optimize_system_performance` - Optimizes core system settings
 function optimize_system_performance() {
     log "Starting system performance optimization"
     
@@ -362,156 +388,22 @@ function optimize_system_performance() {
     return 0
 }
 
-# Progress bar function
-function show_progress() {
-    local current=$1
-    local total=$2
-    local width=30
-    local percentage=$((current * 100 / total))
-    local filled=$((width * current / total))
-    local empty=$((width - filled))
-    
-    printf "\r  ${GRAY}[${GREEN}"
-    printf "%${filled}s" | tr ' ' '█'
-    printf "${GRAY}"
-    printf "%${empty}s" | tr ' ' '░'
-    printf "] ${BOLD}%3d%%${NC}" $percentage
-}
-
-# Progress tracking for optimizations
-function track_progress() {
-    local step=$1
-    local total=$2
-    local message=$3
-    
-    # Calculate percentage
-    local percent=$((step * 100 / total))
-    
-    # Update progress gauge
-    echo $percent | dialog --gauge "$message" \
-                          8 70 0
-}
-
-# Enhanced graphics optimization for systems with limited GPU capabilities
+# `optimize_graphics` - Optimizes graphics settings for low-end GPUs
 function optimize_graphics() {
-    log "Starting graphics optimization"
-    echo -e "\n${CYAN}Detailed Graphics Optimization Progress:${NC}"
+    # Fix WindowServer settings
+    defaults write com.apple.WindowServer UseOptimizedDrawing -bool true 2>/dev/null || true
+    defaults write com.apple.WindowServer Accelerate -bool false 2>/dev/null || true
+    defaults write com.apple.WindowServer EnableHiDPI -bool false 2>/dev/null || true
     
-    # Track changes for summary
-    local changes_made=()
-    local total_steps=15
-    local current_step=0
+    # Fix GPU settings
+    defaults write com.apple.WindowServer MaximumGPUMemory -int 256 2>/dev/null || true
+    defaults write com.apple.WindowServer GPUPowerPolicy -string "minimum" 2>/dev/null || true
+    defaults write com.apple.WindowServer DisableGPUProcessing -bool true 2>/dev/null || true
 
-    # Create backup before making changes
-    backup_graphics_settings
-
-    # 1. Window Server Optimizations
-    echo -e "\n${BOLD}1. Window Server Optimizations:${NC}"
-    
-    ((current_step++))
-    echo -ne "  ${HOURGLASS} Optimizing drawing performance..."
-    if sudo defaults write /Library/Preferences/com.apple.windowserver UseOptimizedDrawing -bool true 2>/dev/null; then
-        defaults write com.apple.WindowServer UseOptimizedDrawing -bool true
-        changes_made+=("Drawing optimization enabled")
-        echo -e "\r  ${GREEN}✓${NC} Drawing performance optimized"
-    else
-        echo -e "\r  ${RED}✗${NC} Failed to optimize drawing performance"
-    fi
-    show_progress $current_step $total_steps
-
-    # 2. Animation and Visual Effects (Force apply with sudo)
-    echo -e "\n${BOLD}2. Animation and Visual Effects:${NC}"
-    
-    ((current_step++))
-    echo -ne "  ${HOURGLASS} Optimizing window animations..."
-    if sudo defaults write -g NSAutomaticWindowAnimationsEnabled -bool false 2>/dev/null; then
-        defaults write -g NSAutomaticWindowAnimationsEnabled -bool false
-        changes_made+=("Window animations disabled")
-        echo -e "\r  ${GREEN}✓${NC} Window animations optimized"
-    else
-        echo -e "\r  ${RED}✗${NC} Failed to disable window animations"
-    fi
-    show_progress $current_step $total_steps
-    
-    ((current_step++))
-    echo -ne "  ${HOURGLASS} Adjusting dock animations..."
-    if sudo defaults write com.apple.dock autohide-time-modifier -float 0.0 2>/dev/null && \
-       sudo defaults write com.apple.dock autohide-delay -float 0.0 2>/dev/null; then
-        defaults write com.apple.dock autohide-time-modifier -float 0.0
-        defaults write com.apple.dock autohide-delay -float 0.0
-        changes_made+=("Dock animations optimized")
-        echo -e "\r  ${GREEN}✓${NC} Dock animations adjusted"
-    else
-        echo -e "\r  ${RED}✗${NC} Failed to adjust dock animations"
-    fi
-    show_progress $current_step $total_steps
-
-    # 3. Transparency and Blur Effects (Force apply with sudo)
-    echo -e "\n${BOLD}3. Transparency and Blur Effects:${NC}"
-    
-    ((current_step++))
-    echo -ne "  ${HOURGLASS} Reducing transparency..."
-    if sudo defaults write com.apple.universalaccess reduceTransparency -bool true 2>/dev/null && \
-       sudo defaults write /Library/Preferences/.GlobalPreferences.plist com.apple.universalaccess.reduceTransparency -bool true 2>/dev/null; then
-        defaults write com.apple.universalaccess reduceTransparency -bool true
-        changes_made+=("System transparency reduced")
-        echo -e "\r  ${GREEN}✓${NC} Transparency reduced"
-    else
-        echo -e "\r  ${RED}✗${NC} Failed to reduce transparency"
-    fi
-    show_progress $current_step $total_steps
-    
-    ((current_step++))
-    echo -ne "  ${HOURGLASS} Disabling transparency completely..."
-    if sudo defaults write com.apple.universalaccess reduceTransparency -bool true 2>/dev/null && \
-       sudo defaults write com.apple.dock showhidden -bool true 2>/dev/null; then
-        defaults write com.apple.universalaccess reduceTransparency -bool true
-        defaults write com.apple.dock showhidden -bool true
-        changes_made+=("System transparency disabled")
-        echo -e "\r  ${GREEN}✓${NC} Transparency disabled"
-    else
-        echo -e "\r  ${RED}✗${NC} Failed to disable transparency"
-    fi
-    show_progress $current_step $total_steps
-
-    # 4. Additional Visual Effects (Force apply)
-    echo -e "\n${BOLD}4. Additional Visual Effects:${NC}"
-    
-    ((current_step++))
-    echo -ne "  ${HOURGLASS} Disabling animation effects..."
-    if sudo defaults write com.apple.dock expose-animation-duration -float 0.1 2>/dev/null && \
-       sudo defaults write -g NSWindowResizeTime -float 0.001 2>/dev/null; then
-        defaults write com.apple.dock expose-animation-duration -float 0.1
-        defaults write -g NSWindowResizeTime -float 0.001
-        changes_made+=("Animation effects disabled")
-        echo -e "\r  ${GREEN}✓${NC} Animation effects disabled"
-    else
-        echo -e "\r  ${RED}✗${NC} Failed to disable animation effects"
-    fi
-    show_progress $current_step $total_steps
-
-    # Force kill all UI processes to apply changes
-    echo -ne "\n${HOURGLASS} Applying all changes (this may cause a brief screen flicker)..."
-    sudo killall Dock &>/dev/null
-    sudo killall Finder &>/dev/null
-    sudo killall SystemUIServer &>/dev/null
-    echo -e "\r${GREEN}✓${NC} All changes applied"
-
-    # Summary
-    echo -e "\n${CYAN}Optimization Summary:${NC}"
-    echo -e "Total optimizations applied: ${#changes_made[@]}"
-    for change in "${changes_made[@]}"; do
-        echo -e "${GREEN}✓${NC} $change"
-    done
-
-    echo -e "\n${YELLOW}Note: Some changes require logging out and back in to take full effect${NC}"
-    echo -e "${YELLOW}If changes are not visible, please log out and log back in${NC}"
-
-    success "Graphics optimization completed with ${#changes_made[@]} improvements"
     return 0
 }
 
-# Add required helper functions
+# `backup_graphics_settings` - Backs up graphics-related settings
 function backup_graphics_settings() {
     local backup_file="$BACKUP_DIR/graphics_$(date +%Y%m%d_%H%M%S)"
     
@@ -525,6 +417,7 @@ function backup_graphics_settings() {
     log "Graphics settings backed up to $backup_file"
 }
 
+# `restart_ui_services` - Restarts UI services
 function restart_ui_services() {
     # Kill less critical services first
     killall Dock Finder SystemUIServer &>/dev/null || true
@@ -537,6 +430,7 @@ function restart_ui_services() {
     fi
 }
 
+# `setup_recovery` - Creates a recovery script
 function setup_recovery() {
     local recovery_script="$BASE_DIR/recovery.sh"
     
@@ -569,7 +463,7 @@ EOF
     log "Recovery script created at $recovery_script"
 }
 
-# New function for display optimization
+# `optimize_display` - Optimizes display settings
 function optimize_display() {
     log "Starting display optimization"
     clear
@@ -630,7 +524,7 @@ function optimize_display() {
     return 0
 }
 
-# Storage Optimization
+# `optimize_storage` - Optimizes disk storage usage
 function optimize_storage() {
     log "Starting storage optimization"
     
@@ -760,7 +654,7 @@ function optimize_storage() {
     return 0
 }
 
-# Network Optimization
+# `optimize_network` - Optimizes network settings
 function optimize_network() {
     log "Starting network optimization"
     
@@ -803,8 +697,11 @@ function optimize_network() {
     # Network stack optimization
     echo -e "\n⏳ [2/$total_steps] Optimizing network stack..."
     local sysctl_settings=(
-        "kern.ipc.somaxconn=1024"
-        "kern.ipc.maxsockbuf=4194304"
+        "kern.ipc.somaxconn=2048"
+        "kern.ipc.maxsockbuf=8388608"
+        "kern.ipc.nmbclusters=65536"
+        "net.inet.tcp.msl=15000"
+        "net.inet.tcp.delayed_ack=0"
     )
     local sysctl_success=true
     
@@ -823,7 +720,7 @@ function optimize_network() {
     
     # IPv6 configuration
     echo -e "\n⏳ [3/$total_steps] Configuring IPv6..."
-    if ! networksetup -setv6off "Wi-Fi" 2>/dev/null; then
+    if ! networksetup -setv6automatic "Wi-Fi" 2>/dev/null; then
         echo -e "${YELLOW}⚠${NC} Failed to configure IPv6"
     else
         echo -e "${GREEN}✓${NC} IPv6 configured"
@@ -850,7 +747,7 @@ function optimize_network() {
     return 0
 }
 
-# Security Optimization
+# `optimize_security` - Optimizes system security settings
 function optimize_security() {
     log "Starting security optimization"
     
@@ -887,6 +784,16 @@ function optimize_security() {
         echo -e "${YELLOW}⚠${NC} Failed to enable stealth mode"
     fi
     
+    if ! sudo "$firewall_path" --setallowsigned on 2>/dev/null; then
+        firewall_success=false
+        echo -e "${YELLOW}⚠${NC} Failed to configure signed apps"
+    fi
+    
+    if ! sudo "$firewall_path" --setloggingmode on 2>/dev/null; then
+        firewall_success=false
+        echo -e "${YELLOW}⚠${NC} Failed to enable logging"
+    fi
+    
     if $firewall_success; then
         echo -e "${GREEN}✓${NC} Firewall configured successfully"
     fi
@@ -900,8 +807,14 @@ function optimize_security() {
         else
             echo -e "${GREEN}✓${NC} Remote login disabled"
         fi
+        
+        if ! sudo systemsetup -setremoteappleevents off 2>/dev/null; then
+            echo -e "${YELLOW}⚠${NC} Failed to disable remote Apple events"
+        else
+            echo -e "${GREEN}✓${NC} Remote Apple events disabled"
+        fi
     else
-        echo -e "${YELLOW}⚠${NC} Remote login configuration skipped (systemsetup not available)"
+        echo -e "${YELLOW}⚠${NC} Remote access configuration skipped (systemsetup not available)"
     fi
     ((current_step++))
     
@@ -931,6 +844,15 @@ function optimize_security() {
     # Check Gatekeeper status
     if ! spctl --status | grep -q "assessments enabled"; then
         echo -e "${YELLOW}⚠${NC} Gatekeeper is disabled"
+        if ! sudo spctl --master-enable 2>/dev/null; then
+            echo -e "${YELLOW}⚠${NC} Failed to enable Gatekeeper"
+            additional_checks=false
+        fi
+    fi
+    
+    # Check automatic updates
+    if ! sudo softwareupdate --schedule on 2>/dev/null; then
+        echo -e "${YELLOW}⚠${NC} Failed to enable automatic updates"
         additional_checks=false
     fi
     
@@ -960,7 +882,7 @@ function optimize_security() {
     return 0
 }
 
-# Backup functionality
+# `create_backup` - Creates a system settings backup
 function create_backup() {
     log "Creating system backup"
     
@@ -981,6 +903,16 @@ function create_backup() {
         return 1
     fi
     
+    # Backup network settings
+    if ! networksetup -getinfo "Wi-Fi" > "$backup_path/wifi_settings.txt" 2>/dev/null; then
+        log "Failed to backup Wi-Fi settings"
+    fi
+    
+    # Backup firewall settings
+    if ! sudo defaults read /Library/Preferences/com.apple.alf > "$backup_path/firewall_settings.txt" 2>/dev/null; then
+        log "Failed to backup firewall settings"
+    fi
+    
     # Backup tracked domains
     for domain in "${TRACKED_DOMAINS[@]}"; do
         if defaults export "$domain" "$backup_path/${domain}.plist" 2>/dev/null; then
@@ -992,7 +924,8 @@ function create_backup() {
     return 0
 }
 
-# Add new functions for enhanced user experience
+# --- Performance Analysis ---
+# `measure_performance` - Measures system performance metrics
 function measure_performance() {
     local measurement_type=$1
     case $measurement_type in
@@ -1003,6 +936,7 @@ function measure_performance() {
     esac
 }
 
+# `show_comparison` - Shows a comparison of system performance
 function show_comparison() {
     local measurement_type=$1
     echo -e "${BLUE}Before:${NC}"
@@ -1016,7 +950,8 @@ function show_comparison() {
     esac
 }
 
-# Display system info with better formatting
+# --- System Information ---
+# `display_system_info` - Displays detailed system information
 function display_system_info() {
     echo -e "\n${BOLD}${CYAN}System Information${NC}\n"
     
@@ -1046,7 +981,7 @@ function display_system_info() {
     echo
 }
 
-# Improved optimization description
+# `describe_optimization` - Provides detailed description of an optimization type
 function describe_optimization() {
     local opt_type=$1
     
@@ -1185,6 +1120,8 @@ function describe_optimization() {
     return 0
 }
 
+# --- Optimization Profiles ---
+# `create_optimization_profile` - Creates an optimization profile
 function create_optimization_profile() {
     local profile_name=$1
     local profile_dir="$PROFILES_DIR/$profile_name"
@@ -1197,6 +1134,7 @@ function create_optimization_profile() {
     echo -e "${GREEN}Profile '$profile_name' created successfully${NC}"
 }
 
+# `apply_optimization_profile` - Applies an optimization profile
 function apply_optimization_profile() {
     local profile_name=$1
     local profile_dir="$PROFILES_DIR/$profile_name"
@@ -1214,6 +1152,8 @@ function apply_optimization_profile() {
     success "Profile '$profile_name' applied successfully"
 }
 
+# --- Quick Fixes ---
+# `quick_fix_menu` - Provides a menu of quick fixes
 function quick_fix_menu() {
     echo -e "\n${CYAN}Quick Fixes:${NC}"
     echo "1) Slow Finder"
@@ -1257,29 +1197,30 @@ function quick_fix_menu() {
     esac
 }
 
-# Add new functions for scheduling and automation
+# --- Scheduling and Automation ---
+# `schedule_optimization` - Schedules automatic optimization runs
 function schedule_optimization() {
     local schedule_type=$1
     local schedule_time=$2
     
-    # Create temporary file with proper error handling
     local temp_crontab
     temp_crontab=$(mktemp) || { error "Failed to create temp file"; return 1; }
     
     crontab -l > "$temp_crontab" 2>/dev/null
     
-    # Remove existing schedules and add new one
+    # Remove any existing mac_optimizer entries
     sed -i.bak "/mac_optimizer/d" "$temp_crontab"
     
+    # Add new schedule based on type
     case $schedule_type in
         "daily")
-            echo "0 $schedule_time * * * \"$0\" --auto" >> "$temp_crontab"
+            echo "0 $schedule_time * * * $0 --auto" >> "$temp_crontab"
             ;;
-        "weekly")
-            echo "0 $schedule_time * * 0 \"$0\" --auto" >> "$temp_crontab"
+        "weekly") 
+            echo "0 $schedule_time * * 0 $0 --auto" >> "$temp_crontab"
             ;;
         "monthly")
-            echo "0 $schedule_time 1 * * \"$0\" --auto" >> "$temp_crontab"
+            echo "0 $schedule_time 1 * * $0 --auto" >> "$temp_crontab"
             ;;
         *)
             rm "$temp_crontab"
@@ -1300,64 +1241,61 @@ function schedule_optimization() {
     fi
 }
 
+# `analyze_system_usage` - Analyzes system usage patterns
 function analyze_system_usage() {
     log "Analyzing system usage patterns"
     
-    # Collect usage data with proper command substitution
-    local cpu_intensive
-    local memory_usage
-    local disk_usage
+    # Get system metrics
+    local cpu_intensive=$(top -l 2 -n 0 -F | grep "CPU usage" | tail -1) || cpu_intensive="Unable to get CPU data"
+    local memory_usage=$(vm_stat | awk '/Pages active/ {print $3}' | sed 's/\.//')
+    local disk_usage=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%')
     local battery_cycles
     
-    cpu_intensive=$(top -l 1 | grep -E "^CPU" | head -1) || cpu_intensive="Unable to get CPU data"
-    memory_usage=$(vm_stat | grep "Pages active" | awk '{print $3}') || memory_usage="0"
-    disk_usage=$(df -h / | awk 'NR==2 {print $5}' | tr -d '%') || disk_usage="0"
-    
     if system_profiler SPPowerDataType &>/dev/null; then
-        battery_cycles=$(system_profiler SPPowerDataType | grep "Cycle Count" | awk '{print $3}') || battery_cycles="Unknown"
+        battery_cycles=$(system_profiler SPPowerDataType | awk '/Cycle Count/ {print $3}')
     else
         battery_cycles="Not available"
     fi
 
-    # Save usage profile with proper heredoc syntax
+    # Save metrics to usage profile
     cat > "$USAGE_PROFILE" << EOF
 last_analyzed=$(date +%s)
 cpu_usage=$cpu_intensive
-memory_usage=$memory_usage
-disk_usage=$disk_usage
-battery_cycles=$battery_cycles
+memory_usage=${memory_usage:-0}
+disk_usage=${disk_usage:-0}
+battery_cycles=${battery_cycles:-Unknown}
 EOF
 
     success "System analysis completed"
     return 0
 }
 
+# `auto_maintenance` - Performs automated maintenance tasks
 function auto_maintenance() {
     log "Starting automated maintenance"
     
-    # Read last run time
     local last_run=0
     [[ -f "$LAST_RUN_FILE" ]] && last_run=$(cat "$LAST_RUN_FILE")
     local current_time=$(date +%s)
     
-    # Only run if more than 24 hours have passed
+    # Run maintenance if 24 hours have passed
     if (( current_time - last_run >= 86400 )); then
-        # Rotate backups
-        local backup_count=$(ls -1 "$HOME/.mac_optimizer_backups/" | wc -l)
-        if (( backup_count > AUTO_BACKUP_LIMIT )); then
-            ls -t "$HOME/.mac_optimizer_backups/" | tail -n +$((AUTO_BACKUP_LIMIT + 1)) | xargs -I {} rm -rf "$HOME/.mac_optimizer_backups/{}"
+        # Cleanup old backups
+        local backup_dir="$HOME/.mac_optimizer/backups"
+        if [[ -d "$backup_dir" ]]; then
+            find "$backup_dir" -type d -mtime +30 -exec rm -rf {} +
         fi
         
-        # Run essential optimizations
         create_backup
         optimize_storage
         optimize_network
         
-        # Update last run time
         echo "$current_time" > "$LAST_RUN_FILE"
     fi
 }
 
+# --- Backup Restoration ---
+# `restore_backup` - Restores system settings from a backup
 function restore_backup() {
     local backup_path=$1
     
@@ -1370,25 +1308,23 @@ function restore_backup() {
     
     # Create safety backup
     local safety_backup="$BASE_DIR/backups/pre_restore_$(date +%Y%m%d_%H%M%S)"
-    if ! create_backup "$safety_backup"; then
-        if ! confirm_dialog "Failed to create safety backup. Continue anyway?"; then
-            return 1
-        fi
-    fi
+    create_backup "$safety_backup" || {
+        warning "Failed to create safety backup"
+    }
     
-    # Restore global defaults
+    # Restore global defaults if they exist
     if [[ -f "$backup_path/global_defaults.plist" ]]; then
-        if ! defaults import -globalDomain "$backup_path/global_defaults.plist"; then
+        defaults import -globalDomain "$backup_path/global_defaults.plist" || {
             error "Failed to restore global defaults"
             return 1
-        fi
+        }
     fi
     
-    # Restore domain-specific settings
     local restored=0
     local failed=0
     
-    for file in "$backup_path"/*.plist; do
+    # Restore individual plists
+    while IFS= read -r file; do
         local domain=$(basename "$file" .plist)
         if [[ "$domain" != "global_defaults" ]]; then
             if defaults import "$domain" "$file" 2>/dev/null; then
@@ -1398,10 +1334,10 @@ function restore_backup() {
                 error "Failed to restore: $domain"
             fi
         fi
-    done
+    done < <(find "$backup_path" -name "*.plist")
     
-    # Restart affected services
-    killall Dock Finder SystemUIServer &>/dev/null
+    # Restart UI processes
+    killall Dock Finder SystemUIServer &>/dev/null || true
     
     echo -e "\n${CYAN}Restore Summary:${NC}"
     echo -e "Successfully restored: ${GREEN}$restored${NC} domains"
@@ -1411,597 +1347,33 @@ function restore_backup() {
     return 0
 }
 
-# Function to get system changes history
-function get_system_changes() {
-    local hours=$1
-    local since=$(($(date +%s) - hours * 3600))
-    clear
-    
-    echo -e "\n${BOLD}${CYAN}System Changes History (Last $hours hours)${NC}\n"
-    
-    # Track defaults changes
-    echo -e "${UNDERLINE}System Preferences Changes${NC}"
-    local found_changes=false
-    
-    for domain in "${TRACKED_DOMAINS[@]}"; do
-        local changes=$(log show --predicate 'process == "cfprefsd" or process == "defaults"' --style compact --start "-${hours}h" 2>/dev/null | grep -i "$domain" | grep "write")
-        if [[ -n "$changes" ]]; then
-            found_changes=true
-            echo -e "\n  ${BOLD}$domain${NC}"
-            while IFS= read -r line; do
-                local timestamp=$(echo "$line" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}')
-                local change=$(echo "$line" | grep -oE 'write.*$')
-                printf "  ${DIM}%s${NC} %s\n" "$timestamp" "$change"
-            done <<< "$changes"
-        fi
-    done
-    
-    # Track UI changes
-    echo -e "\n${UNDERLINE}UI Changes${NC}"
-    local ui_changes=$(log show --predicate 'process == "Dock" or process == "Finder"' --style compact --start "-${hours}h" 2>/dev/null | grep -i "restart")
-    if [[ -n "$ui_changes" ]]; then
-        found_changes=true
-        while IFS= read -r line; do
-            local timestamp=$(echo "$line" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}')
-            local change=$(echo "$line" | grep -oE 'restart.*$')
-            printf "  ${DIM}%s${NC} %s\n" "$timestamp" "$change"
-        done <<< "$ui_changes"
-    fi
-    
-    # Track performance changes
-    echo -e "\n${UNDERLINE}Performance Changes${NC}"
-    local perf_changes=$(log show --predicate 'process == "pmset" or process == "systemstats"' --style compact --start "-${hours}h" 2>/dev/null | grep -i "change")
-    if [[ -n "$perf_changes" ]]; then
-        found_changes=true
-        while IFS= read -r line; do
-            local timestamp=$(echo "$line" | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}')
-            local change=$(echo "$line" | grep -oE 'change.*$')
-            printf "  ${DIM}%s${NC} %s\n" "$timestamp" "$change"
-        done <<< "$perf_changes"
-    fi
-    
-    if ! $found_changes; then
-        echo -e "  ${DIM}No changes found in the last $hours hours${NC}"
-    fi
-    
-    echo -e "\n${UNDERLINE}Actions${NC}"
-    echo -e "  ${BOLD}1)${NC} Revert specific change"
-    echo -e "  ${BOLD}2)${NC} Revert all changes in this period"
-    echo -e "  ${BOLD}0)${NC} Back to main menu"
-    
-    read -p "$(echo -e "${GRAY}Enter your choice:${NC} ")" choice
-    
-    case $choice in
-        1)
-            revert_specific_change
-            ;;
-        2)
-            if confirm_action "revert all changes from the last $hours hours"; then
-                revert_changes_period $hours
-            fi
-            ;;
-        0) return ;;
-        *) error "Invalid choice" ;;
-    esac
-}
-
-# Function to revert specific change
-function revert_specific_change() {
-    echo -e "\n${BOLD}${CYAN}Revert Specific Change${NC}\n"
-    echo -e "${DIM}Enter the domain and key to revert (e.g., com.apple.dock autohide-delay)${NC}"
-    read -p "Domain: " domain
-    read -p "Key: " key
-    
-    if [[ -z "$domain" || -z "$key" ]]; then
-        error "Domain and key are required"
-        return 1
-    fi
-    
-    # Get the default value
-    local default_value=$(defaults read-type "$domain" "$key" 2>/dev/null)
-    if [[ $? -eq 0 ]]; then
-        echo -e "\nCurrent value: $default_value"
-        if confirm_action "revert this setting to system default"; then
-            defaults delete "$domain" "$key" 2>/dev/null
-            if [[ "$domain" == "com.apple.dock" ]]; then
-                killall Dock &>/dev/null
-            elif [[ "$domain" == "com.apple.finder" ]]; then
-                killall Finder &>/dev/null
-            fi
-            success "Setting reverted to system default"
-        fi
-    else
-        error "Setting not found or cannot be read"
-        return 1
-    fi
-}
-
-# Function to revert changes for a period
-function revert_changes_period() {
-    local hours=$1
-    local since=$(($(date +%s) - hours * 3600))
-    
-    echo -e "\n${BOLD}${CYAN}Reverting Changes${NC}\n"
-    
-    # Create temporary backup
-    local temp_backup_dir="/tmp/mac_optimizer_temp_backup_$(date +%s)"
-    mkdir -p "$temp_backup_dir"
-    
-    # Backup current settings
-    for domain in "${TRACKED_DOMAINS[@]}"; do
-        defaults export "$domain" "$temp_backup_dir/${domain}.plist" 2>/dev/null
-    done
-    
-    # Revert changes
-    local reverted=0
-    for domain in "${TRACKED_DOMAINS[@]}"; do
-        local changes=$(log show --predicate "process == \"cfprefsd\" or process == \"defaults\"" --style compact --start "-${hours}h" 2>/dev/null | grep -i "$domain" | grep "write")
-        if [[ -n "$changes" ]]; then
-            ((reverted++))
-            defaults delete "$domain" &>/dev/null
-        fi
-    done
-    
-    # Restart affected services
-    killall Dock Finder &>/dev/null
-    
-    if (( reverted > 0 )); then
-        success "Reverted $reverted domain(s) to system defaults"
-        echo -e "${DIM}Backup saved to: $temp_backup_dir${NC}"
-    else
-        rm -rf "$temp_backup_dir"
-        echo -e "${DIM}No changes to revert${NC}"
-    fi
-}
-
-# Initialize directory structure and files
-function initialize_workspace() {
-    log "Initializing workspace structure"
-    
-    # Create main directory structure
-    local directories=(
-        "$BASE_DIR"
-        "$BASE_DIR/backups"
-        "$BASE_DIR/profiles"
-        "$BASE_DIR/logs"
-    )
-    
-    for dir in "${directories[@]}"; do
-        if [[ ! -d "$dir" ]]; then
-            mkdir -p "$dir"
-            log "Created directory: $dir"
-        fi
-    done
-    
-    # Initialize required files with default content if they don't exist
-    if [[ ! -f "$SETTINGS_FILE" ]]; then
-        cat > "$SETTINGS_FILE" << EOF
-# macOS Optimizer Settings
-version=$VERSION
-last_run=0
-auto_maintenance=false
-backup_limit=$AUTO_BACKUP_LIMIT
-EOF
-        log "Created settings file: $SETTINGS_FILE"
-    fi
-    
-    if [[ ! -f "$USAGE_PROFILE" ]]; then
-        cat > "$USAGE_PROFILE" << EOF
-last_analyzed=0
-cpu_usage=0
-memory_usage=0
-disk_usage=0
-battery_cycles=0
-EOF
-        log "Created usage profile: $USAGE_PROFILE"
-    fi
-    
-    if [[ ! -f "$SCHEDULE_FILE" ]]; then
-        echo "# Optimization Schedule" > "$SCHEDULE_FILE"
-        log "Created schedule file: $SCHEDULE_FILE"
-    fi
-    
-    if [[ ! -f "$LAST_RUN_FILE" ]]; then
-        echo "0" > "$LAST_RUN_FILE"
-        log "Created last run file: $LAST_RUN_FILE"
-    fi
-    
-    success "Workspace initialization completed"
-}
-
-# Enhanced menu selection with arrow keys
-function select_menu_option() {
-    local options=("$@")
-    local selected=0
-    local key
-    
-    tput civis  # Hide cursor
-    
-    while true; do
-        # Clear previous menu
-        for ((i=0; i<${#options[@]}; i++)); do
-            tput cup $((i + 1)) 0
-            tput el
-            if [ $i -eq $selected ]; then
-                echo -e "${CYAN}→ ${options[$i]}${NC}"
-            else
-                echo -e "  ${options[$i]}"
-            fi
-        done
-        
-        # Read a single keypress
-        read -rsn1 key
-        case "$key" in
-            $'\x1B')  # ESC sequence
-                read -rsn2 key
-                if [[ -z "$key" ]]; then  # Single ESC press
-                    if confirm_dialog "Are you sure you want to exit?"; then
-                        cleanup_and_exit 0
-                    fi
-                fi
-                case "$key" in
-                    '[A')  # Up arrow
-                        ((selected--))
-                        [ $selected -lt 0 ] && selected=$((${#options[@]} - 1))
-                        ;;
-                    '[B')  # Down arrow
-                        ((selected++))
-                        [ $selected -ge ${#options[@]} ] && selected=0
-                        ;;
-                esac
-                ;;
-            'q')  # Quit
-                if confirm_dialog "Are you sure you want to exit?"; then
-                    cleanup_and_exit 0
-                fi
-                ;;
-            '')  # Enter key
-                tput cnorm  # Show cursor
-                return $selected
-                ;;
-        esac
-    done
-}
-
-# Enhanced confirmation dialog with arrow keys
-function confirm_dialog() {
-    local message=$1
-    local options=("Yes" "No")
-    local selected=1  # Default to "No"
-    local key
-    
-    # Save cursor position
-    tput sc
-    
-    while true; do
-        # Restore cursor position
-        tput rc
-        
-        # Clear lines
-        echo -e "\n\n\n"
-        tput rc
-        
-        # Show message and options
-        echo -e "\n${YELLOW}${message}${NC}"
-        echo
-        for ((i=0; i<${#options[@]}; i++)); do
-            if [ $i -eq $selected ]; then
-                echo -e "${CYAN}→ ${options[$i]}${NC}"
-            else
-                echo -e "  ${options[$i]}"
-            fi
-        done
-        
-        # Read a single keypress
-        read -rsn1 key
-        case "$key" in
-            $'\x1B')  # ESC sequence
-                read -rsn2 key
-                case "$key" in
-                    '[A'|'[D')  # Up arrow or Left arrow
-                        ((selected--))
-                        [ $selected -lt 0 ] && selected=$((${#options[@]} - 1))
-                        ;;
-                    '[B'|'[C')  # Down arrow or Right arrow
-                        ((selected++))
-                        [ $selected -ge ${#options[@]} ] && selected=0
-                        ;;
-                esac
-                ;;
-            '')  # Enter key
-                tput rc
-                tput ed  # Clear to end of screen
-                return $selected
-                ;;
-            'q')  # Quit
-                tput rc
-                tput ed
-                return 1
-                ;;
-        esac
-    done
-}
-
-# Update the optimization functions to use the new confirmation dialog
-function run_optimization() {
-    local opt_type=$1
-    local opt_func=$2
-    
-    clear
-    echo -e "\n${BOLD}${CYAN}Running $opt_type Optimization${NC}\n"
-    
-    # Show current system state
-    echo -e "${CYAN}Current System State:${NC}"
-    case $opt_type in
-        "System Performance")
-            echo -e "CPU Load: $(top -l 1 | grep "CPU usage" | cut -d: -f2)"
-            echo -e "Memory Pressure: $(memory_pressure)"
-            ;;
-        "Graphics")
-            echo -e "GPU Info: $(system_profiler SPDisplaysDataType 2>/dev/null | grep "Chipset Model" | cut -d: -f2)"
-            echo -e "Resolution: $(system_profiler SPDisplaysDataType 2>/dev/null | grep "Resolution" | head -1 | cut -d: -f2)"
-            ;;
-        "Storage")
-            echo -e "Available Space: $(df -h / | awk 'NR==2 {print $4}')"
-            echo -e "Cache Size: $(du -sh ~/Library/Caches 2>/dev/null | cut -f1)"
-            ;;
-        "Network")
-            echo -e "DNS Response: $(ping -c 1 8.8.8.8 2>/dev/null | grep "time=" | cut -d= -f4)"
-            echo -e "Network Interface: $(networksetup -listallhardwareports | grep -A 1 "Wi-Fi" | tail -1 | cut -d: -f2)"
-            ;;
-        "Security")
-            echo -e "Firewall Status: $(sudo defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo "Unknown")"
-            echo -e "FileVault Status: $(fdesetup status | grep -o "On\|Off")"
-            ;;
-    esac
-    echo -e "\n${DIM}----------------------------------------${NC}"
-    
-    # Show optimization steps
-    echo -e "\n${CYAN}Optimization Steps:${NC}"
-    case $opt_type in
-        "System Performance")
-            echo -e "1. Optimizing kernel parameters"
-            echo -e "2. Adjusting memory management"
-            echo -e "3. Configuring power settings"
-            ;;
-        "Graphics")
-            echo -e "1. Optimizing UI animations"
-            echo -e "2. Adjusting transparency"
-            echo -e "3. Configuring GPU settings"
-            ;;
-        "Storage")
-            echo -e "1. Cleaning system caches"
-            echo -e "2. Removing old logs"
-            echo -e "3. Managing Time Machine snapshots"
-            ;;
-        "Network")
-            echo -e "1. Optimizing DNS settings"
-            echo -e "2. Configuring network stack"
-            echo -e "3. Adjusting TCP parameters"
-            ;;
-        "Security")
-            echo -e "1. Configuring firewall"
-            echo -e "2. Setting up security policies"
-            echo -e "3. Verifying system integrity"
-            ;;
-    esac
-    echo -e "${DIM}----------------------------------------${NC}\n"
-    
-    # Run the optimization with progress tracking
-    echo -e "${CYAN}[1/3]${NC} Analyzing current settings..."
-    measure_performance "$opt_type"
-    sleep 1
-    
-    echo -e "\n${CYAN}[2/3]${NC} Applying optimizations..."
-    echo -ne "${CYAN}⟳${NC} Running optimization..."
-    if ! $opt_func; then
-        echo -e "\r${RED}✗${NC} Optimization failed"
-        error "Failed to complete optimization"
-    else
-        echo -e "\r${GREEN}✓${NC} Optimizations applied successfully"
-        success "Completed optimization steps"
-    fi
-    
-    echo -e "\n${CYAN}[3/3]${NC} Verifying changes..."
-    show_comparison "$opt_type"
-    
-    # Show optimization summary
-    echo -e "\n${CYAN}Optimization Summary:${NC}"
-    case $opt_type in
-        "System Performance")
-            echo -e "New CPU Load: $(top -l 1 | grep "CPU usage" | cut -d: -f2)"
-            echo -e "New Memory Pressure: $(memory_pressure)"
-            ;;
-        "Graphics")
-            echo -e "UI Animations: Optimized"
-            echo -e "Transparency: Reduced"
-            ;;
-        "Storage")
-            echo -e "New Available Space: $(df -h / | awk 'NR==2 {print $4}')"
-            echo -e "New Cache Size: $(du -sh ~/Library/Caches 2>/dev/null | cut -f1)"
-            ;;
-        "Network")
-            echo -e "New DNS Response: $(ping -c 1 8.8.8.8 2>/dev/null | grep "time=" | cut -d= -f4)"
-            echo -e "Network Stack: Optimized"
-            ;;
-        "Security")
-            echo -e "Firewall: Configured"
-            echo -e "Security Policies: Applied"
-            ;;
-    esac
-    
-    echo -e "\n${DIM}----------------------------------------${NC}"
-    echo -e "\n${GREEN}✓${NC} $opt_type optimization completed"
-    echo -e "${DIM}Press any key to continue...${NC}"
-    read -n 1
-    return 0
-}
-
-# Simplify run_remaining_optimizations to be automatic
-function run_remaining_optimizations() {
-    local current_opt=$1
-    local all_opts=(
-        "performance"
-        "graphics"
-        "storage"
-        "network"
-        "security"
-        "power"
-        "display"
-    )
-    
-    # Run remaining optimizations automatically
-    for ((i=0; i<${#all_opts[@]}; i++)); do
-        local opt="${all_opts[i]}"
-        echo -e "\n${CYAN}Running $opt optimization...${NC}"
-        run_optimization "$opt" "optimize_$opt"
-    done
-    
-    success "All optimizations completed"
-    sleep 1
-}
-
-# Main menu function
-function show_beautiful_menu() {
-    while true; do
-        clear
-        echo -e "\n${BOLD}${CYAN}macOS Optimizer Menu${NC}\n"
-        echo -e "${DIM}Use ↑/↓ arrows to navigate, Enter to select, 'q' to quit${NC}\n"
-        
-        local options=(
-            "${CYAN}⚡${NC} System Performance Optimization"
-            "${PURPLE}🎨${NC} Graphics & UI Optimization"
-            "${GREEN}💾${NC} Display Optimization"
-            "${BLUE}💾${NC} Storage Optimization"
-            "${YELLOW}🌐${NC} Network Optimization" 
-            "${RED}🔒${NC} Security Hardening"
-            "${CYAN}🔄${NC} Run All Optimizations"
-            "${BLUE}ℹ️${NC} System Information"
-            "${GREEN}💾${NC} Backup/Restore"
-            "${RED}✖${NC} Exit"
-        )
-        
-        select_menu_option "${options[@]}"
-        local choice=$?
-        
-        clear
-        case $choice in
-            0) 
-                run_optimization "System Performance" optimize_system_performance
-                ;;
-            1) 
-                run_optimization "Graphics" optimize_graphics
-                ;;
-            2)
-                run_optimization "Display" optimize_display
-                ;;
-            3) 
-                run_optimization "Storage" optimize_storage
-                ;;
-            4) 
-                run_optimization "Network" optimize_network
-                ;;
-            5) 
-                run_optimization "Security" optimize_security
-                ;;
-            6) 
-                run_all_optimizations
-                ;;
-            7) 
-                display_system_info
-                echo -e "\nPress any key to continue..."
-                read -n 1
-                ;;
-            8)
-                create_backup
-                show_restore_menu
-                ;;
-            9|255)
-                if confirm_dialog "Are you sure you want to exit?"; then
-                    cleanup_and_exit 0
-                fi
-                ;;
-        esac
-    done
-}
-
-# Update run_all_optimizations for better visual feedback
-function run_all_optimizations() {
-    log "Running all optimizations..."
-    clear
-    
-    local optimizations=(
-        "System Performance:optimize_system_performance"
-        "Graphics:optimize_graphics"
-        "Display:optimize_display"
-        "Storage:optimize_storage"
-        "Network:optimize_network"
-        "Security:optimize_security"
-    )
-    
-    local total=${#optimizations[@]}
-    local current=0
-    
-    echo -e "\n${BOLD}${CYAN}Running All Optimizations${NC}\n"
-    echo -e "${DIM}Each optimization will run sequentially${NC}\n"
-    
-    for opt in "${optimizations[@]}"; do
-        ((current++))
-        local name=${opt%%:*}
-        local func=${opt#*:}
-        
-        echo -e "\n${CYAN}[$current/$total] Running $name Optimization${NC}"
-        echo -e "${DIM}----------------------------------------${NC}"
-        
-        # Show progress spinner
-        echo -ne "${CYAN}⟳${NC} Running optimization..."
-        if ! $func; then
-            echo -e "\r${RED}✗${NC} $name optimization failed"
-        else
-            echo -e "\r${GREEN}✓${NC} $name optimization completed"
-        fi
-        
-        # Show progress bar
-        show_progress $current $total
-        echo -e "${DIM}----------------------------------------${NC}"
-        sleep 1
-    done
-    
-    echo -e "\n${GREEN}✓${NC} All optimizations completed"
-    echo -e "${DIM}Press any key to return to menu...${NC}"
-    read -n 1
-}
-
-# Main execution
+# --- Main Script Execution ---
+# Main function to handle script execution
 function main() {
-    # Set error handling
-    set +e
-    trap 'cleanup_and_exit 1' INT TERM
-    trap 'cleanup_and_exit 0' EXIT
+    # Check system requirements
+    check_system_requirements || exit 1
     
-    # Hide cursor during execution
-    tput civis 2>/dev/null || true
+    # Setup trap for cleanup
+    trap cleanup EXIT
     
-    # Initialize workspace
-    if ! mkdir -p "$BASE_DIR" 2>/dev/null; then
-        error "Failed to create base directory: $BASE_DIR"
-        exit 1
-    fi
-    
-    # Start menu
-    show_beautiful_menu
+    # Process command line arguments
+    case "${1:-}" in
+        "--auto")
+            auto_maintenance
+            ;;
+        "--help"|"-h")
+            display_help
+            ;;
+        "--version"|"-v")
+            echo "Mac Optimizer v$VERSION"
+            ;;
+        *)
+            # Interactive mode
+            display_system_info
+            quick_fix_menu
+            ;;
+    esac
 }
 
-# Cleanup and exit
-function cleanup_and_exit() {
-    local exit_code=${1:-0}
-                            cleanup
-                            clear
-    tput cnorm # Show cursor
-    echo -e "\n${CYAN}Thank you for using macOS Optimizer!${NC}"
-    echo -e "${DIM}Visit github.com/samihalawa/macos-optimizer for updates${NC}\n"
-    exit $exit_code
-}
-
-# Start the script
+# Run main function
 main "$@"
