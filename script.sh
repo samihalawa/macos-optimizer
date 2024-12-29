@@ -1821,7 +1821,6 @@ function main() {
 
 # Ensure proper cleanup on script exit
 function cleanup() {
-    tput cnorm # Show cursor
     echo -e "\n${GRAY}Cleaning up...${NC}"
     
     # Remove temporary files
@@ -1847,4 +1846,4 @@ function cleanup() {
 
 # Start the script
 main "$@"
-tput cnorm # Ensure cursor is visible on exit
+echo -e "\033[?25h" # Ensure cursor is visible on exit
