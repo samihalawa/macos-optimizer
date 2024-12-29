@@ -316,11 +316,13 @@ function show_progress_bar() {
     local empty=$((width - filled))
     
     # Build the progress bar
-    printf "\r${CYAN}${spinner[$spin_idx]}${NC} "
+    tput cr
+    printf "${CYAN}${spinner[$spin_idx]}${NC} "
     printf "${title} ["
     printf "%${filled}s" | tr ' ' '█'
     printf "%${empty}s" | tr ' ' '░'
     printf "] ${percent}%%"
+    tput el
     
     # Add completion message if done
     if [ "$current" -eq "$total" ]; then
@@ -348,7 +350,9 @@ function show_spinner() {
         printf "\r${CYAN}${spin:$i:1}${NC} %s..." "$message"
         sleep .1
     done
-    printf "\r${GREEN}✓${NC} %s... Done\n" "$message"
+    tput cr
+    tput el
+    printf "${GREEN}✓${NC} %s... Done\n" "$message"
 }
 
 # Update optimize_system_performance to use the new progress indicators
@@ -462,11 +466,13 @@ function show_progress() {
     local percentage=$((current * 100 / total))
     local filled=$((width * current / total))
     local empty=$((width - filled))
-    printf "\r  ${GRAY}[${GREEN}"
+    tput cr
+    printf "  ${GRAY}[${GREEN}"
     printf "█%.0s" $(seq 1 $filled)
     printf "${GRAY}"
     printf "░%.0s" $(seq 1 $empty)
     printf "] ${BOLD}%3d%%${NC}" $percentage
+    tput el
 }
 
 # Progress tracking for optimizations
