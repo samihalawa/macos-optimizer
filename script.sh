@@ -9,6 +9,7 @@ set -e
 readonly VERSION="2.1"
 readonly BASE_DIR="$HOME/.mac_optimizer"
 readonly BACKUP_DIR="$BASE_DIR/backups/$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$BACKUP_DIR"
 readonly LOG_FILE="$BACKUP_DIR/optimizer.log"
 readonly SETTINGS_FILE="$BASE_DIR/settings"
 readonly MIN_MACOS_VERSION="10.15" # Minimum supported macOS version (Catalina)
@@ -26,6 +27,10 @@ readonly TRACKED_DOMAINS=(
     "com.apple.QuickLookUI"
     "NSGlobalDomain"
 )
+if ! command -v system_profiler &> /dev/null; then
+    echo "system_profiler command not found. Please ensure it is installed." >&2
+    exit 1
+fi
 readonly GPU_INFO=$(system_profiler SPDisplaysDataType 2>/dev/null)
 
 # Constants for special characters
@@ -70,7 +75,7 @@ function handle_error() {
     local error_msg=$1
     local error_code=${2:-1}
     
-    echo -e "${RED}Error: $error_msg${NC}" >&2
+    echo -e "${RED}Error: $error_msg (Code: $error_code)${NC}" >&2
     log "ERROR: $error_msg (Code: $error_code)"
     
     case $error_code in
