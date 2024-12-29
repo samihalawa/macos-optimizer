@@ -1847,3 +1847,4 @@ function cleanup() {
 
 # Start the script
 main "$@"
+tput cnorm # Ensure cursor is visible on exit
