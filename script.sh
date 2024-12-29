@@ -633,8 +633,15 @@ function optimize_display() {
     echo -e "\n${BOLD}${CYAN}Display Optimization${NC}"
     echo -e "${DIM}Optimizing display settings for better performance...${NC}\n"
     
+    # Create measurements directory if it doesn't exist
+    mkdir -p "$BACKUP_DIR"
+    
+    # Store initial measurements
+    system_profiler SPDisplaysDataType > "$MEASUREMENTS_FILE.before"
+    
     local total_steps=5
     local current_step=0
+    local changes_made=()
     
     # Get display information
     local display_info=$(system_profiler SPDisplaysDataType)
@@ -645,40 +652,70 @@ function optimize_display() {
     ((current_step++))
     track_progress $current_step $total_steps "Optimizing resolution settings"
     if [[ -n "$is_retina" ]]; then
-        defaults write NSGlobalDomain AppleFontSmoothing -int 0
-        defaults write NSGlobalDomain CGFontRenderingFontSmoothingDisabled -bool true
-        printf "\r  ${GREEN}✓${NC} Optimized Retina settings for performance\n"
+        if sudo defaults write NSGlobalDomain AppleFontSmoothing -int 0 && \
+           sudo defaults write NSGlobalDomain CGFontRenderingFontSmoothingDisabled -bool true; then
+            changes_made+=("Optimized Retina display settings")
+            printf "\r  ${GREEN}✓${NC} Optimized Retina settings for performance\n"
+        fi
     else
-        defaults write NSGlobalDomain AppleFontSmoothing -int 1
-        printf "\r  ${GREEN}✓${NC} Optimized standard display settings\n"
+        if sudo defaults write NSGlobalDomain AppleFontSmoothing -int 1; then
+            changes_made+=("Optimized standard display settings")
+            printf "\r  ${GREEN}✓${NC} Optimized standard display settings\n"
+        fi
     fi
     
     # Color profile optimization
     ((current_step++))
     track_progress $current_step $total_steps "Optimizing color settings"
-    defaults write NSGlobalDomain AppleICUForce24HourTime -bool true
-    defaults write NSGlobalDomain AppleDisplayScaleFactor -int 1
-    printf "\r  ${GREEN}✓${NC} Display color optimized\n"
+    if sudo defaults write NSGlobalDomain AppleICUForce24HourTime -bool true && \
+       sudo defaults write NSGlobalDomain AppleDisplayScaleFactor -int 1; then
+        changes_made+=("Optimized color settings")
+        printf "\r  ${GREEN}✓${NC} Display color optimized\n"
+    fi
     
     # Font rendering
     ((current_step++))
     track_progress $current_step $total_steps "Optimizing font rendering"
-    defaults write NSGlobalDomain AppleFontSmoothing -int 1
-    defaults write -g CGFontRenderingFontSmoothingDisabled -bool NO
-    printf "\r  ${GREEN}✓${NC} Font rendering optimized\n"
+    if sudo defaults write NSGlobalDomain AppleFontSmoothing -int 1 && \
+       sudo defaults write -g CGFontRenderingFontSmoothingDisabled -bool NO; then
+        changes_made+=("Optimized font rendering")
+        printf "\r  ${GREEN}✓${NC} Font rendering optimized\n"
+    fi
     
     # Screen update optimization
     ((current_step++))
     track_progress $current_step $total_steps "Optimizing screen updates"
-    defaults write com.apple.CrashReporter DialogType none
-    defaults write com.apple.screencapture disable-shadow -bool true
-    printf "\r  ${GREEN}✓${NC} Screen updates optimized\n"
+    if sudo defaults write com.apple.CrashReporter DialogType none && \
+       sudo defaults write com.apple.screencapture disable-shadow -bool true; then
+        changes_made+=("Optimized screen updates")
+        printf "\r  ${GREEN}✓${NC} Screen updates optimized\n"
+    fi
     
     # Apply changes
     ((current_step++))
     track_progress $current_step $total_steps "Applying display changes"
     killall SystemUIServer &>/dev/null
     printf "\r  ${GREEN}✓${NC} Display changes applied\n"
+    
+    # Store final measurements
+    system_profiler SPDisplaysDataType > "$MEASUREMENTS_FILE.after"
+    
+    # Show optimization summary
+    echo -e "\n${CYAN}Optimization Summary:${NC}"
+    echo -e "Total optimizations applied: ${#changes_made[@]}"
+    for change in "${changes_made[@]}"; do
+        echo -e "${GREEN}✓${NC} $change"
+    done
+    
+    # Compare before/after display settings
+    echo -e "\n${CYAN}Display Settings Changes:${NC}"
+    local before_res=$(grep "Resolution:" "$MEASUREMENTS_FILE.before" | head -1 | cut -d: -f2-)
+    local after_res=$(grep "Resolution:" "$MEASUREMENTS_FILE.after" | head -1 | cut -d: -f2-)
+    echo -e "Resolution: $before_res -> $after_res"
+    
+    local before_depth=$(grep "Depth:" "$MEASUREMENTS_FILE.before" | head -1 | cut -d: -f2-)
+    local after_depth=$(grep "Depth:" "$MEASUREMENTS_FILE.after" | head -1 | cut -d: -f2-)
+    echo -e "Color Depth: $before_depth -> $after_depth"
     
     echo -e "\n${GREEN}Display optimization completed successfully${NC}"
     echo -e "${DIM}Note: Some changes may require a logout/login to take full effect${NC}"
@@ -691,67 +728,66 @@ function optimize_storage() {
     log "Starting storage optimization"
     
     echo -e "\n${CYAN}Storage Optimization Progress:${NC}"
-    echo -e "This will clean up unnecessary files and optimize storage usage."
     
     # Show initial storage status
     echo -e "${STATS} Current Storage Status:"
     df -h / | awk 'NR==2 {printf "Available: %s of %s\n", $4, $2}'
-    echo -e "Cache Size: $(du -sh ~/Library/Caches 2>/dev/null | cut -f1)\n"
     
-    # 1. Clean User Cache
-    echo -e "${HOURGLASS} Cleaning user cache..."
-    sudo rm -rf ~/Library/Caches/* 2>/dev/null
-    sudo rm -rf ~/Library/Application\ Support/*/Cache/* 2>/dev/null
-    echo -e "${GREEN}✓${NC} User cache cleaned"
+    # 1. Clean User Cache (faster with parallel execution)
+    echo -e "\n${HOURGLASS} Cleaning user cache..."
+    {
+        rm -rf ~/Library/Caches/* 
+        rm -rf ~/Library/Application\ Support/*/Cache/*
+    } 2>/dev/null &
     
-    # 2. Clean System Cache
-    echo -e "\n${HOURGLASS} Cleaning system cache..."
-    sudo rm -rf /Library/Caches/* 2>/dev/null
-    sudo rm -rf /System/Library/Caches/* 2>/dev/null
-    echo -e "${GREEN}✓${NC} System cache cleaned"
+    # 2. Clean System Cache (in parallel)
+    echo -e "${HOURGLASS} Cleaning system cache..."
+    {
+        sudo rm -rf /Library/Caches/* 
+        sudo rm -rf /System/Library/Caches/*
+    } 2>/dev/null &
     
-    # 3. Clean Temporary Files
-    echo -e "\n${HOURGLASS} Cleaning temporary files..."
-    sudo rm -rf /private/var/folders/*/* 2>/dev/null
-    sudo rm -rf /private/var/tmp/* 2>/dev/null
-    sudo rm -rf /tmp/* 2>/dev/null
-    echo -e "${GREEN}✓${NC} Temporary files cleaned"
+    # 3. Clean Docker-related files (even if Docker is not running)
+    echo -e "${HOURGLASS} Cleaning Docker files..."
+    {
+        # Clean Docker logs
+        sudo rm -rf ~/Library/Containers/com.docker.docker/Data/vms/* 
+        sudo rm -rf ~/Library/Containers/com.docker.docker/Data/log/*
+        sudo rm -rf ~/Library/Containers/com.docker.docker/Data/com.docker.driver.amd64-linux/log/*
+        
+        # Clean Docker cache
+        sudo rm -rf ~/Library/Containers/com.docker.docker/Data/cache/*
+        sudo rm -rf ~/Library/Group\ Containers/group.com.docker/Data/cache/*
+        
+        # Clean Docker temporary files
+        sudo rm -rf ~/Library/Containers/com.docker.docker/Data/tmp/*
+        
+        # Clean Docker build cache
+        sudo rm -rf ~/Library/Group\ Containers/group.com.docker/Data/docker.sock
+        sudo rm -rf ~/Library/Group\ Containers/group.com.docker/Data/vms/*
+    } 2>/dev/null &
     
-    # 4. Clean Logs
-    echo -e "\n${HOURGLASS} Cleaning old logs..."
-    sudo rm -rf /private/var/log/* 2>/dev/null
-    echo -e "${GREEN}✓${NC} System logs cleaned"
+    # 4. Clean Development Caches (in parallel)
+    echo -e "${HOURGLASS} Cleaning development caches..."
+    {
+        rm -rf ~/Library/Developer/Xcode/DerivedData/* 
+        rm -rf ~/Library/Developer/Xcode/iOS\ DeviceSupport/* 
+        rm -rf ~/Library/Developer/Xcode/Archives/*
+    } 2>/dev/null &
     
-    # 5. Clean Development Caches
-    echo -e "\n${HOURGLASS} Cleaning development caches..."
-    local dev_paths=(
-        "$HOME/Library/Developer"
-        "$HOME/Library/Developer/Xcode/DerivedData"
-        "$HOME/Library/Developer/Xcode/iOS DeviceSupport"
-        "$HOME/Library/Developer/Xcode/Archives"
-    )
+    # 5. Clean Logs (in parallel)
+    echo -e "${HOURGLASS} Cleaning logs..."
+    {
+        sudo rm -rf /private/var/log/*
+        sudo rm -rf ~/Library/Logs/*
+    } 2>/dev/null &
     
-    for path in "${dev_paths[@]}"; do
-        if [[ -d "$path" ]]; then
-            sudo rm -rf "${path:?}/"* 2>/dev/null
-        fi
-    done
-    echo -e "${GREEN}✓${NC} Development caches cleaned"
-    
-    # 6. Clean .DS_Store files
-    echo -e "\n${HOURGLASS} Cleaning .DS_Store files..."
-    sudo find / -name ".DS_Store" -depth -exec rm {} \; 2>/dev/null
-    echo -e "${GREEN}✓${NC} .DS_Store files cleaned"
-    
-    # 7. Clean Downloads folder (optional)
-    echo -e "\n${HOURGLASS} Cleaning old downloads..."
-    find ~/Downloads -mtime +30 -delete 2>/dev/null
-    echo -e "${GREEN}✓${NC} Old downloads cleaned"
+    # Wait for all parallel jobs to complete
+    wait
     
     # Show final storage status
     echo -e "\n${STATS} Updated Storage Status:"
     df -h / | awk 'NR==2 {printf "Available: %s of %s\n", $4, $2}'
-    echo -e "Cache Size: $(du -sh ~/Library/Caches 2>/dev/null | cut -f1)"
     
     success "Storage optimization completed"
     return 0
