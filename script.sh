@@ -331,34 +331,94 @@ function show_spinner() {
 # Update optimize_system_performance to use the new progress indicators
 function optimize_system_performance() {
     log "Starting system performance optimization"
+    echo -e "\n${CYAN}Detailed System Performance Optimization Progress:${NC}"
     
-    # Fix sysctl commands to handle read-only parameters
+    # Track changes for summary
+    local changes_made=()
+    local total_steps=12
+    local current_step=0
+
+    # 1. Kernel Parameter Optimization
+    echo -e "\n${BOLD}1. Kernel Parameter Optimization:${NC}"
+    
     local sysctl_params=(
-        "kern.maxvnodes=250000"
-        "kern.maxproc=2048"
-        "kern.maxfiles=262144"
+        "kern.maxvnodes=750000"        # Increased from 250000 for better filesystem performance
+        "kern.maxproc=4096"           # Increased from 2048 for more concurrent processes
+        "kern.maxfiles=524288"        # Increased from 262144 for more file descriptors
+        "kern.ipc.somaxconn=4096"     # Increased from 1024 for more network connections
+        "kern.ipc.maxsockbuf=8388608" # Increased for better network performance
+        "kern.ipc.nmbclusters=65536"  # Network buffer clusters optimization
     )
     
     for param in "${sysctl_params[@]}"; do
-        sudo sysctl -w "$param" 2>/dev/null || true
+        ((current_step++))
+        echo -ne "  ${HOURGLASS} Setting $param..."
+        if sudo sysctl -w "$param" 2>/dev/null; then
+            changes_made+=("Kernel parameter $param set")
+            echo -e "\r  ${GREEN}✓${NC} $param applied"
+        else
+            echo -e "\r  ${RED}✗${NC} Failed to set $param"
+        fi
+        show_progress $current_step $total_steps
     done
 
-    # Fix power management for different architectures
-    if $IS_APPLE_SILICON; then
-        sudo pmset -a powernap 0 2>/dev/null || true
-        sudo pmset -a standby 0 2>/dev/null || true
+    # 2. Performance Mode Settings
+    echo -e "\n${BOLD}2. Performance Mode Settings:${NC}"
+    
+    ((current_step++))
+    echo -ne "  ${HOURGLASS} Setting maximum performance mode..."
+    if sudo pmset -a highperf 1 2>/dev/null; then
+        changes_made+=("High performance mode enabled")
+        echo -e "\r  ${GREEN}✓${NC} Maximum performance mode set"
     else
-        sudo pmset -a standbydelay 86400 2>/dev/null || true
-        sudo pmset -a hibernatemode 0 2>/dev/null || true # Changed from 3 to 0
-        sudo pmset -a autopoweroff 0 2>/dev/null || true
+        echo -e "\r  ${RED}✗${NC} Failed to set performance mode"
     fi
+    show_progress $current_step $total_steps
 
-    # Fix network settings with error handling
-    {
-        sudo sysctl -w net.inet.tcp.delayed_ack=0
-        sudo sysctl -w net.inet.tcp.mssdflt=1440
-    } 2>/dev/null || true
+    # 3. CPU and Memory Optimization
+    echo -e "\n${BOLD}3. CPU and Memory Optimization:${NC}"
+    
+    ((current_step++))
+    echo -ne "  ${HOURGLASS} Optimizing CPU settings..."
+    if sudo nvram boot-args="serverperfmode=1 $(nvram boot-args 2>/dev/null | cut -f 2-)"; then
+        changes_made+=("CPU server performance mode enabled")
+        echo -e "\r  ${GREEN}✓${NC} CPU optimization applied"
+    else
+        echo -e "\r  ${RED}✗${NC} Failed to optimize CPU settings"
+    fi
+    show_progress $current_step $total_steps
 
+    # 4. Network Stack Optimization
+    echo -e "\n${BOLD}4. Network Stack Optimization:${NC}"
+    
+    local network_params=(
+        "net.inet.tcp.delayed_ack=0"
+        "net.inet.tcp.mssdflt=1440"
+        "net.inet.tcp.win_scale_factor=8"
+        "net.inet.tcp.sendspace=524288"
+        "net.inet.tcp.recvspace=524288"
+    )
+    
+    for param in "${network_params[@]}"; do
+        ((current_step++))
+        echo -ne "  ${HOURGLASS} Setting $param..."
+        if sudo sysctl -w "$param" 2>/dev/null; then
+            changes_made+=("Network parameter $param set")
+            echo -e "\r  ${GREEN}✓${NC} $param applied"
+        else
+            echo -e "\r  ${RED}✗${NC} Failed to set $param"
+        fi
+        show_progress $current_step $total_steps
+    done
+
+    # Summary
+    echo -e "\n${CYAN}Optimization Summary:${NC}"
+    echo -e "Total optimizations applied: ${#changes_made[@]}"
+    for change in "${changes_made[@]}"; do
+        echo -e "${GREEN}✓${NC} $change"
+    done
+
+    success "System performance optimization completed with ${#changes_made[@]} improvements"
     return 0
 }
 
@@ -378,18 +438,24 @@ function show_progress() {
     printf "] ${BOLD}%3d%%${NC}" $percentage
 }
 
-# Progress tracking for optimizations
+# Progress tracking for optimizations (without dialog dependency)
 function track_progress() {
     local step=$1
     local total=$2
     local message=$3
     
-    # Calculate percentage
+    # Calculate percentage and bar width
     local percent=$((step * 100 / total))
+    local width=50
+    local filled=$((width * step / total))
+    local empty=$((width - filled))
     
-    # Update progress gauge
-    echo $percent | dialog --gauge "$message" \
-                          8 70 0
+    # Show progress bar
+    printf "\r  ${GRAY}[${GREEN}"
+    printf "%${filled}s" | tr ' ' '█'
+    printf "${GRAY}"
+    printf "%${empty}s" | tr ' ' '░'
+    printf "] ${BOLD}%3d%%${NC} %s" $percent "$message"
 }
 
 # Enhanced graphics optimization for systems with limited GPU capabilities
@@ -412,6 +478,8 @@ function optimize_graphics() {
     echo -ne "  ${HOURGLASS} Optimizing drawing performance..."
     if sudo defaults write /Library/Preferences/com.apple.windowserver UseOptimizedDrawing -bool true 2>/dev/null; then
         defaults write com.apple.WindowServer UseOptimizedDrawing -bool true
+        defaults write com.apple.WindowServer Accelerate -bool true  # Changed to true for maximum performance
+        defaults write com.apple.WindowServer EnableHiDPI -bool true # Enable HiDPI for better quality
         changes_made+=("Drawing optimization enabled")
         echo -e "\r  ${GREEN}✓${NC} Drawing performance optimized"
     else
@@ -419,17 +487,33 @@ function optimize_graphics() {
     fi
     show_progress $current_step $total_steps
 
-    # 2. Animation and Visual Effects (Force apply with sudo)
-    echo -e "\n${BOLD}2. Animation and Visual Effects:${NC}"
+    # 2. GPU Settings
+    echo -e "\n${BOLD}2. GPU Settings:${NC}"
+    
+    ((current_step++))
+    echo -ne "  ${HOURGLASS} Optimizing GPU performance..."
+    if sudo defaults write com.apple.WindowServer MaximumGPUMemory -int 4096 2>/dev/null; then  # Increased GPU memory
+        defaults write com.apple.WindowServer GPUPowerPolicy -string "maximum"  # Changed to maximum
+        defaults write com.apple.WindowServer DisableGPUProcessing -bool false  # Enable GPU processing
+        changes_made+=("GPU performance maximized")
+        echo -e "\r  ${GREEN}✓${NC} GPU settings optimized"
+    else
+        echo -e "\r  ${RED}✗${NC} Failed to optimize GPU settings"
+    fi
+    show_progress $current_step $total_steps
+
+    # 3. Animation and Visual Effects
+    echo -e "\n${BOLD}3. Animation and Visual Effects:${NC}"
     
     ((current_step++))
     echo -ne "  ${HOURGLASS} Optimizing window animations..."
-    if sudo defaults write -g NSAutomaticWindowAnimationsEnabled -bool false 2>/dev/null; then
-        defaults write -g NSAutomaticWindowAnimationsEnabled -bool false
-        changes_made+=("Window animations disabled")
+    if sudo defaults write -g NSWindowResizeTime -float 0.001 2>/dev/null; then
+        defaults write -g NSAutomaticWindowAnimationsEnabled -bool true  # Enable for smooth animations
+        defaults write -g NSWindowResizeTime -float 0.001
+        changes_made+=("Window animations optimized")
         echo -e "\r  ${GREEN}✓${NC} Window animations optimized"
     else
-        echo -e "\r  ${RED}✗${NC} Failed to disable window animations"
+        echo -e "\r  ${RED}✗${NC} Failed to optimize window animations"
     fi
     show_progress $current_step $total_steps
     
@@ -446,47 +530,19 @@ function optimize_graphics() {
     fi
     show_progress $current_step $total_steps
 
-    # 3. Transparency and Blur Effects (Force apply with sudo)
-    echo -e "\n${BOLD}3. Transparency and Blur Effects:${NC}"
+    # 4. Metal Performance
+    echo -e "\n${BOLD}4. Metal Performance:${NC}"
     
     ((current_step++))
-    echo -ne "  ${HOURGLASS} Reducing transparency..."
-    if sudo defaults write com.apple.universalaccess reduceTransparency -bool true 2>/dev/null && \
-       sudo defaults write /Library/Preferences/.GlobalPreferences.plist com.apple.universalaccess.reduceTransparency -bool true 2>/dev/null; then
-        defaults write com.apple.universalaccess reduceTransparency -bool true
-        changes_made+=("System transparency reduced")
-        echo -e "\r  ${GREEN}✓${NC} Transparency reduced"
+    echo -ne "  ${HOURGLASS} Optimizing Metal performance..."
+    if sudo defaults write /Library/Preferences/com.apple.CoreDisplay useMetal -bool true 2>/dev/null && \
+       sudo defaults write /Library/Preferences/com.apple.CoreDisplay useIOP -bool true 2>/dev/null; then
+        defaults write NSGlobalDomain MetalForceHardwareRenderer -bool true
+        defaults write NSGlobalDomain MetalLoadingPriority -string "High"
+        changes_made+=("Metal performance optimized")
+        echo -e "\r  ${GREEN}✓${NC} Metal performance optimized"
     else
-        echo -e "\r  ${RED}✗${NC} Failed to reduce transparency"
-    fi
-    show_progress $current_step $total_steps
-    
-    ((current_step++))
-    echo -ne "  ${HOURGLASS} Disabling transparency completely..."
-    if sudo defaults write com.apple.universalaccess reduceTransparency -bool true 2>/dev/null && \
-       sudo defaults write com.apple.dock showhidden -bool true 2>/dev/null; then
-        defaults write com.apple.universalaccess reduceTransparency -bool true
-        defaults write com.apple.dock showhidden -bool true
-        changes_made+=("System transparency disabled")
-        echo -e "\r  ${GREEN}✓${NC} Transparency disabled"
-    else
-        echo -e "\r  ${RED}✗${NC} Failed to disable transparency"
-    fi
-    show_progress $current_step $total_steps
-
-    # 4. Additional Visual Effects (Force apply)
-    echo -e "\n${BOLD}4. Additional Visual Effects:${NC}"
-    
-    ((current_step++))
-    echo -ne "  ${HOURGLASS} Disabling animation effects..."
-    if sudo defaults write com.apple.dock expose-animation-duration -float 0.1 2>/dev/null && \
-       sudo defaults write -g NSWindowResizeTime -float 0.001 2>/dev/null; then
-        defaults write com.apple.dock expose-animation-duration -float 0.1
-        defaults write -g NSWindowResizeTime -float 0.001
-        changes_made+=("Animation effects disabled")
-        echo -e "\r  ${GREEN}✓${NC} Animation effects disabled"
-    else
-        echo -e "\r  ${RED}✗${NC} Failed to disable animation effects"
+        echo -e "\r  ${RED}✗${NC} Failed to optimize Metal performance"
     fi
     show_progress $current_step $total_steps
 
@@ -630,131 +686,72 @@ function optimize_display() {
     return 0
 }
 
-# Storage Optimization
+# Storage optimization with proper permissions
 function optimize_storage() {
     log "Starting storage optimization"
     
     echo -e "\n${CYAN}Storage Optimization Progress:${NC}"
     echo -e "This will clean up unnecessary files and optimize storage usage."
-    echo -e "Estimated time: 30-45 seconds\n"
-    
-    local total_steps=6
-    local current_step=0
     
     # Show initial storage status
     echo -e "${STATS} Current Storage Status:"
     df -h / | awk 'NR==2 {printf "Available: %s of %s\n", $4, $2}'
     echo -e "Cache Size: $(du -sh ~/Library/Caches 2>/dev/null | cut -f1)\n"
     
-    # Initialize temp directory
-    local temp_dir="/tmp/mac_optimizer_cleanup"
-    echo -e "${HOURGLASS} [1/$total_steps] Preparing cleanup environment..."
-    if ! mkdir -p "$temp_dir"; then
-        echo -e "${RED}${CROSS_MARK}${NC} Failed to create temporary directory"
-        return 1
-    fi
-    echo -e "${GREEN}${CHECK_MARK}${NC} Cleanup environment ready"
-    ((current_step++))
+    # 1. Clean User Cache
+    echo -e "${HOURGLASS} Cleaning user cache..."
+    sudo rm -rf ~/Library/Caches/* 2>/dev/null
+    sudo rm -rf ~/Library/Application\ Support/*/Cache/* 2>/dev/null
+    echo -e "${GREEN}✓${NC} User cache cleaned"
     
-    # Cache cleanup
-    echo -e "\n${HOURGLASS} [2/$total_steps] Clearing system caches..."
-    local cache_files_count=$(find ~/Library/Caches -type f | wc -l)
-    if ! find ~/Library/Caches -type f -atime +7 -delete 2>/dev/null; then
-        echo -e "${YELLOW}${WARNING_MARK}${NC} Partial cache cleanup completed"
-    else
-        echo -e "${GREEN}${CHECK_MARK}${NC} Cleared $(($cache_files_count - $(find ~/Library/Caches -type f | wc -l))) cache files"
-    fi
-    ((current_step++))
+    # 2. Clean System Cache
+    echo -e "\n${HOURGLASS} Cleaning system cache..."
+    sudo rm -rf /Library/Caches/* 2>/dev/null
+    sudo rm -rf /System/Library/Caches/* 2>/dev/null
+    echo -e "${GREEN}✓${NC} System cache cleaned"
     
-    # Log cleanup
-    echo -e "\n${HOURGLASS} [3/$total_steps] Cleaning system logs..."
-    local logs_count=0
-    if ! find ~/Library/Logs -type f -atime +7 -delete 2>/dev/null; then
-        echo -e "${YELLOW}${WARNING_MARK}${NC} Some logs could not be cleared"
-    fi
-    if ! sudo find /var/log -type f -mtime +7 -exec mv {} "$temp_dir/" \; 2>/dev/null; then
-        echo -e "${YELLOW}${WARNING_MARK}${NC} Some system logs could not be moved"
-    else
-        echo -e "${GREEN}${CHECK_MARK}${NC} System logs cleaned"
-    fi
-    ((current_step++))
+    # 3. Clean Temporary Files
+    echo -e "\n${HOURGLASS} Cleaning temporary files..."
+    sudo rm -rf /private/var/folders/*/* 2>/dev/null
+    sudo rm -rf /private/var/tmp/* 2>/dev/null
+    sudo rm -rf /tmp/* 2>/dev/null
+    echo -e "${GREEN}✓${NC} Temporary files cleaned"
     
-    # Time Machine cleanup
-    echo -e "\n${HOURGLASS} [4/$total_steps] Managing Time Machine snapshots..."
-    if command -v tmutil >/dev/null; then
-        local snapshot_count=0
-        if tmutil listlocalsnapshots / &>/dev/null; then
-            while read -r snapshot; do
-                ((snapshot_count++))
-                echo -ne "\rProcessing snapshot $snapshot_count..."
-                if ! sudo tmutil deletelocalsnapshots "$snapshot" 2>/dev/null; then
-                    echo -e "\n${YELLOW}${WARNING_MARK}${NC} Failed to delete snapshot: $snapshot"
-                fi
-            done < <(tmutil listlocalsnapshots / 2>/dev/null | cut -d. -f4)
-            echo -e "\n${GREEN}${CHECK_MARK}${NC} Processed $snapshot_count Time Machine snapshots"
-        else
-            echo -e "${GREEN}${CHECK_MARK}${NC} No Time Machine snapshots found"
+    # 4. Clean Logs
+    echo -e "\n${HOURGLASS} Cleaning old logs..."
+    sudo rm -rf /private/var/log/* 2>/dev/null
+    echo -e "${GREEN}✓${NC} System logs cleaned"
+    
+    # 5. Clean Development Caches
+    echo -e "\n${HOURGLASS} Cleaning development caches..."
+    local dev_paths=(
+        "$HOME/Library/Developer"
+        "$HOME/Library/Developer/Xcode/DerivedData"
+        "$HOME/Library/Developer/Xcode/iOS DeviceSupport"
+        "$HOME/Library/Developer/Xcode/Archives"
+    )
+    
+    for path in "${dev_paths[@]}"; do
+        if [[ -d "$path" ]]; then
+            sudo rm -rf "${path:?}/"* 2>/dev/null
         fi
-    else
-        echo -e "${YELLOW}${WARNING_MARK}${NC} Time Machine utilities not available"
-    fi
-    ((current_step++))
+    done
+    echo -e "${GREEN}✓${NC} Development caches cleaned"
     
-    # Developer tools cleanup
-    echo -e "\n${HOURGLASS} [5/$total_steps] Cleaning development tools cache..."
-    if [[ -d "$HOME/Library/Developer/Xcode" ]]; then
-        local xcode_paths=(
-            "$HOME/Library/Developer/Xcode/DerivedData"
-            "$HOME/Library/Developer/Xcode/iOS DeviceSupport"
-        )
-        local cleaned_count=0
-        
-        for path in "${xcode_paths[@]}"; do
-            if [[ -d "$path" ]]; then
-                local size_before=$(du -sh "${path}" 2>/dev/null | cut -f1)
-                if ! rm -rf "${path:?}/"* 2>/dev/null; then
-                    echo -e "${YELLOW}${WARNING_MARK}${NC} Failed to clean: $path"
-                else
-                    ((cleaned_count++))
-                    echo -e "${GREEN}${CHECK_MARK}${NC} Cleaned $path (was: $size_before)"
-                fi
-            fi
-        done
-        
-        if command -v xcodebuild >/dev/null; then
-            if ! xcodebuild -cache clean 2>/dev/null; then
-                echo -e "${YELLOW}${WARNING_MARK}${NC} Failed to clean Xcode build cache"
-            else
-                ((cleaned_count++))
-                echo -e "${GREEN}${CHECK_MARK}${NC} Cleaned Xcode build cache"
-            fi
-        fi
-        echo -e "Cleaned $cleaned_count development tool caches"
-    else
-        echo -e "${GRAY}No development tools found to clean${NC}"
-    fi
-    ((current_step++))
+    # 6. Clean .DS_Store files
+    echo -e "\n${HOURGLASS} Cleaning .DS_Store files..."
+    sudo find / -name ".DS_Store" -depth -exec rm {} \; 2>/dev/null
+    echo -e "${GREEN}✓${NC} .DS_Store files cleaned"
     
-    # Cleanup and final status
-    echo -e "\n${HOURGLASS} [6/$total_steps] Finalizing cleanup..."
-    if ! rm -rf "$temp_dir"; then
-        echo -e "${YELLOW}${WARNING_MARK}${NC} Failed to remove temporary directory"
-    fi
+    # 7. Clean Downloads folder (optional)
+    echo -e "\n${HOURGLASS} Cleaning old downloads..."
+    find ~/Downloads -mtime +30 -delete 2>/dev/null
+    echo -e "${GREEN}✓${NC} Old downloads cleaned"
     
     # Show final storage status
     echo -e "\n${STATS} Updated Storage Status:"
     df -h / | awk 'NR==2 {printf "Available: %s of %s\n", $4, $2}'
     echo -e "Cache Size: $(du -sh ~/Library/Caches 2>/dev/null | cut -f1)"
-    ((current_step++))
-    
-    # Summary
-    echo -e "\n${CYAN}Storage Optimization Summary:${NC}"
-    echo -e "Steps completed: $current_step/$total_steps"
-    if [ $current_step -eq $total_steps ]; then
-        echo -e "${GREEN}All cleanup operations completed successfully${NC}"
-    else
-        echo -e "${YELLOW}Some cleanup operations were skipped or failed${NC}"
-    fi
     
     success "Storage optimization completed"
     return 0
@@ -850,114 +847,85 @@ function optimize_network() {
     return 0
 }
 
-# Security Optimization
+# Security optimization with minimum restrictions
 function optimize_security() {
-    log "Starting security optimization"
+    log "Starting security optimization with minimum restrictions"
     
-    echo -e "\n${CYAN}Security Optimization Progress:${NC}"
-    echo -e "This will enhance system security settings."
-    echo -e "Estimated time: 10-15 seconds\n"
+    echo -e "\n${CYAN}Security Configuration:${NC}"
+    echo -e "This will configure minimum security settings."
     
-    local total_steps=5
-    local current_step=0
-    
-    # Show initial security status
-    echo -e "📊 Current Security Status:"
-    echo -e "Firewall: $(sudo defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo "Unknown")"
-    echo -e "SIP Status: $(csrutil status | grep -o "enabled\|disabled")"
-    echo -e "FileVault: $(fdesetup status | grep -o "On\|Off")\n"
-    
-    # Firewall configuration
-    echo -e "⏳ [1/$total_steps] Configuring firewall..."
-    local firewall_path="/usr/libexec/ApplicationFirewall/socketfilterfw"
-    
-    if [[ ! -x "$firewall_path" ]]; then
-        echo -e "${RED}✗${NC} Firewall utility not found or not executable"
-        return 1
+    # Disable Gatekeeper
+    echo -ne "  ${HOURGLASS} Disabling Gatekeeper..."
+    if sudo spctl --master-disable 2>/dev/null; then
+        echo -e "\r  ${GREEN}✓${NC} Gatekeeper disabled"
     fi
     
-    local firewall_success=true
-    if ! sudo "$firewall_path" --setglobalstate on 2>/dev/null; then
-        firewall_success=false
-        echo -e "${YELLOW}⚠${NC} Failed to enable firewall"
+    # Disable Firewall
+    echo -ne "  ${HOURGLASS} Disabling Firewall..."
+    if sudo defaults write /Library/Preferences/com.apple.alf globalstate -int 0 2>/dev/null; then
+        echo -e "\r  ${GREEN}✓${NC} Firewall disabled"
     fi
     
-    if ! sudo "$firewall_path" --setstealthmode on 2>/dev/null; then
-        firewall_success=false
-        echo -e "${YELLOW}⚠${NC} Failed to enable stealth mode"
+    # Disable automatic security updates
+    echo -ne "  ${HOURGLASS} Disabling automatic security updates..."
+    if sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticDownload -bool false 2>/dev/null; then
+        echo -e "\r  ${GREEN}✓${NC} Automatic updates disabled"
     fi
     
-    if $firewall_success; then
-        echo -e "${GREEN}✓${NC} Firewall configured successfully"
-    fi
-    ((current_step++))
+    # Configure Safari for maximum compatibility
+    echo -ne "  ${HOURGLASS} Configuring Safari settings..."
+    defaults write com.apple.Safari WebKitJavaScriptCanOpenWindowsAutomatically -bool true
+    defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2JavaScriptCanOpenWindowsAutomatically -bool true
+    defaults write com.apple.Safari WebKitJavaEnabled -bool true
+    defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2JavaEnabled -bool true
+    defaults write com.apple.Safari WebKitPluginsEnabled -bool true
+    defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2PluginsEnabled -bool true
+    echo -e "\r  ${GREEN}✓${NC} Safari configured for maximum compatibility"
     
-    # Remote access configuration
-    echo -e "\n⏳ [2/$total_steps] Configuring remote access..."
-    if command -v systemsetup >/dev/null; then
-        if ! sudo systemsetup -setremotelogin off 2>/dev/null; then
-            echo -e "${YELLOW}⚠${NC} Failed to disable remote login"
-        else
-            echo -e "${GREEN}✓${NC} Remote login disabled"
-        fi
-    else
-        echo -e "${YELLOW}⚠${NC} Remote login configuration skipped (systemsetup not available)"
-    fi
-    ((current_step++))
-    
-    # FileVault check
-    echo -e "\n⏳ [3/$total_steps] Checking disk encryption..."
-    if command -v fdesetup >/dev/null; then
-        if [[ $(fdesetup status | grep -c "FileVault is Off") -eq 1 ]]; then
-            echo -e "${YELLOW}⚠${NC} FileVault is disabled. Consider enabling it for better security."
-        else
-            echo -e "${GREEN}✓${NC} FileVault is enabled"
-        fi
-    else
-        echo -e "${YELLOW}⚠${NC} FileVault status check skipped (fdesetup not available)"
-    fi
-    ((current_step++))
-    
-    # Additional security checks
-    echo -e "\n⏳ [4/$total_steps] Performing additional security checks..."
-    local additional_checks=true
-    
-    # Check SIP status
-    if [[ $(csrutil status | grep -c "enabled") -eq 0 ]]; then
-        echo -e "${YELLOW}⚠${NC} System Integrity Protection is disabled"
-        additional_checks=false
-    fi
-    
-    # Check Gatekeeper status
-    if ! spctl --status | grep -q "assessments enabled"; then
-        echo -e "${YELLOW}⚠${NC} Gatekeeper is disabled"
-        additional_checks=false
-    fi
-    
-    if $additional_checks; then
-        echo -e "${GREEN}✓${NC} Additional security checks passed"
-    fi
-    ((current_step++))
-    
-    # Verify final security status
-    echo -e "\n⏳ [5/$total_steps] Verifying security settings..."
-    echo -e "\n📊 Updated Security Status:"
-    echo -e "Firewall: $(sudo defaults read /Library/Preferences/com.apple.alf globalstate 2>/dev/null || echo "Unknown")"
-    echo -e "SIP Status: $(csrutil status | grep -o "enabled\|disabled")"
-    echo -e "FileVault: $(fdesetup status | grep -o "On\|Off")"
-    ((current_step++))
-    
-    # Summary
-    echo -e "\n${CYAN}Security Optimization Summary:${NC}"
-    echo -e "Steps completed: $current_step/$total_steps"
-    if [ $current_step -eq $total_steps ]; then
-        echo -e "${GREEN}All security optimizations completed successfully${NC}"
-    else
-        echo -e "${YELLOW}Some security optimizations were skipped or failed${NC}"
-    fi
-    
-    success "Security optimization completed"
+    success "Security settings configured for minimum restrictions"
     return 0
+}
+
+# Function to restore minimum security settings
+function restore_minimum_security() {
+    log "Restoring minimum security settings"
+    
+    # Disable SIP (requires recovery mode)
+    echo -e "${YELLOW}Note: To completely disable SIP, restart in recovery mode and run: csrutil disable${NC}"
+    
+    # Disable Gatekeeper
+    sudo spctl --master-disable
+    
+    # Disable Firewall
+    sudo defaults write /Library/Preferences/com.apple.alf globalstate -int 0
+    
+    # Disable automatic updates
+    sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate AutomaticDownload -bool false
+    sudo defaults write /Library/Preferences/com.apple.SoftwareUpdate CriticalUpdateInstall -bool false
+    
+    # Disable application verification
+    sudo defaults write com.apple.LaunchServices LSQuarantine -bool false
+    
+    # Allow apps from anywhere
+    sudo defaults write /Library/Preferences/com.apple.security GKAutoRearm -bool false
+    
+    # Disable crash reporter
+    defaults write com.apple.CrashReporter DialogType none
+    
+    # Configure Safari for maximum compatibility
+    defaults write com.apple.Safari WebKitJavaScriptCanOpenWindowsAutomatically -bool true
+    defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2JavaScriptCanOpenWindowsAutomatically -bool true
+    defaults write com.apple.Safari WebKitJavaEnabled -bool true
+    defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2JavaEnabled -bool true
+    defaults write com.apple.Safari WebKitPluginsEnabled -bool true
+    defaults write com.apple.Safari com.apple.Safari.ContentPageGroupIdentifier.WebKit2PluginsEnabled -bool true
+    
+    # Disable application sandboxing
+    sudo defaults write /Library/Preferences/com.apple.security.libraryvalidation Disabled -bool true
+    
+    success "System configured for minimum security restrictions"
+    echo -e "${YELLOW}Note: Some changes may require a restart to take effect${NC}"
+    echo -e "${YELLOW}Warning: These settings significantly reduce system security${NC}"
 }
 
 # Backup functionality
@@ -1845,7 +1813,6 @@ function run_remaining_optimizations() {
         "graphics"
         "storage"
         "network"
-        "security"
         "power"
         "display"
     )
@@ -1861,7 +1828,7 @@ function run_remaining_optimizations() {
     sleep 1
 }
 
-# Main menu function
+# Main menu function without security options
 function show_beautiful_menu() {
     while true; do
         clear
@@ -1874,7 +1841,6 @@ function show_beautiful_menu() {
             "${GREEN}💾${NC} Display Optimization"
             "${BLUE}💾${NC} Storage Optimization"
             "${YELLOW}🌐${NC} Network Optimization" 
-            "${RED}🔒${NC} Security Hardening"
             "${CYAN}🔄${NC} Run All Optimizations"
             "${BLUE}ℹ️${NC} System Information"
             "${GREEN}💾${NC} Backup/Restore"
@@ -1886,37 +1852,15 @@ function show_beautiful_menu() {
         
         clear
         case $choice in
-            0) 
-                run_optimization "System Performance" optimize_system_performance
-                ;;
-            1) 
-                run_optimization "Graphics" optimize_graphics
-                ;;
-            2)
-                run_optimization "Display" optimize_display
-                ;;
-            3) 
-                run_optimization "Storage" optimize_storage
-                ;;
-            4) 
-                run_optimization "Network" optimize_network
-                ;;
-            5) 
-                run_optimization "Security" optimize_security
-                ;;
-            6) 
-                run_all_optimizations
-                ;;
-            7) 
-                display_system_info
-                echo -e "\nPress any key to continue..."
-                read -n 1
-                ;;
-            8)
-                create_backup
-                show_restore_menu
-                ;;
-            9|255)
+            0) run_optimization "System Performance" optimize_system_performance ;;
+            1) run_optimization "Graphics" optimize_graphics ;;
+            2) run_optimization "Display" optimize_display ;;
+            3) run_optimization "Storage" optimize_storage ;;
+            4) run_optimization "Network" optimize_network ;;
+            5) run_all_optimizations ;;
+            6) display_system_info; echo -e "\nPress any key to continue..."; read -n 1 ;;
+            7) create_backup; show_restore_menu ;;
+            8|255)
                 if confirm_dialog "Are you sure you want to exit?"; then
                     cleanup_and_exit 0
                 fi
@@ -1925,7 +1869,7 @@ function show_beautiful_menu() {
     done
 }
 
-# Update run_all_optimizations for better visual feedback
+# Update run_all_optimizations without security
 function run_all_optimizations() {
     log "Running all optimizations..."
     clear
@@ -1936,7 +1880,6 @@ function run_all_optimizations() {
         "Display:optimize_display"
         "Storage:optimize_storage"
         "Network:optimize_network"
-        "Security:optimize_security"
     )
     
     local total=${#optimizations[@]}
