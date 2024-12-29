@@ -1771,6 +1771,8 @@ function show_main_menu() {
             10|255) 
                 if confirm_dialog "Are you sure you want to exit?"; then
                     exit 0
+                else
+                    continue
                 fi
                 ;;
         esac
