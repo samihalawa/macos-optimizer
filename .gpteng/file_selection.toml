@@ -1,0 +1,25 @@
+# Remove '#' to select a file or turn off linting.
+
+# Linting with BLACK (Python) enhances code suggestions from LLMs. To disable linting, uncomment the relevant option in the linting settings.
+
+# gpt-engineer can only read selected files. Including irrelevant files will degrade performance, cost additional tokens and potentially overflow token limit.
+
+[linting]
+"linting" = "off"
+
+[files]
+# "script-original.sh" = "selected"
+# LICENSE = "selected"
+# "PRODUCTION-script.sh" = "selected"
+# "requirements.txt" = "selected"
+# "script.sh" = "selected"
+# "README.md" = "selected"
+# "README_es.md" = "selected"
+# "errors-found-when-running-it-on-macos-intel.log" = "selected"
+"nicegui1.py" = "selected"
+# "nicegui_reference.md" = "selected"
+# "initial_script.sh" = "selected"
+# "app.log" = "selected"
+# "gemininew.sh" = "selected"
+# "README-ZH.md" = "selected"
+# 
