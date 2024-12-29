@@ -1723,10 +1723,9 @@ function run_optimization() {
             measure_performance "$opt_type"
             $opt_func
             show_comparison "$opt_type"
-            return 0
+            return
         fi
     fi
-    return 1
 }
 
 # Update show_main_menu to use the new confirmation dialog
@@ -1748,32 +1747,34 @@ function show_main_menu() {
         "Exit"
     )
     
-    select_menu_option "${options[@]}"
-    local choice=$?
-    
-    case $choice in
-        0) run_optimization "performance" optimize_system_performance ;;
-        1) run_optimization "graphics" optimize_graphics ;;
-        2) run_optimization "storage" optimize_storage ;;
-        3) run_optimization "network" optimize_network ;;
-        4) run_optimization "security" optimize_security ;;
-        5) run_optimization "power" optimize_power ;;
-        6)
-            if confirm_dialog "This will run all optimizations. Are you sure?"; then
-                verify_system_state
-                create_backup
-                run_all_optimizations
-            fi
-            ;;
-        7) display_system_info ;;
-        8) create_backup ;;
-        9) restore_backup ;;
-        10|255) 
-            if confirm_dialog "Are you sure you want to exit?"; then
-                exit_script
-            fi
-            ;;
-    esac
+    while true; do
+        select_menu_option "${options[@]}"
+        local choice=$?
+        
+        case $choice in
+            0) run_optimization "performance" optimize_system_performance ;;
+            1) run_optimization "graphics" optimize_graphics ;;
+            2) run_optimization "storage" optimize_storage ;;
+            3) run_optimization "network" optimize_network ;;
+            4) run_optimization "security" optimize_security ;;
+            5) run_optimization "power" optimize_power ;;
+            6)
+                if confirm_dialog "This will run all optimizations. Are you sure?"; then
+                    verify_system_state
+                    create_backup
+                    run_all_optimizations
+                fi
+                ;;
+            7) display_system_info ;;
+            8) create_backup ;;
+            9) restore_backup ;;
+            10|255) 
+                if confirm_dialog "Are you sure you want to exit?"; then
+                    break
+                fi
+                ;;
+        esac
+    done
 }
 
 # Main execution
