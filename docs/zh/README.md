@@ -1,14 +1,28 @@
 # macOS 优化器：优化您的 Mac，实现最佳性能
 
-<img width="100%" alt="截屏2024-05-15 下午4 18 24" src="https://github.com/samihalawa/mac-megaoptimizer/assets/3243470/77941cba-e4dd-4b42-9092-7cc82d1ce046">
+一个强大的工具，可以优化和增强您的 macOS 体验，提供命令行和图形界面两个版本。
 
-## 欢迎
+## 两个版本
 
-欢迎使用 macOS 优化器，这是您优化和增强 macOS 体验的理想选择。该仓库包含一系列 Bash 脚本，旨在帮助您充分释放 Mac 的性能和效率。
+### 命令行版本
+![命令行截图](../images/cli-screenshot.png)
 
-<img width="100%" alt="截屏2024-05-15 下午4 27 03" src="https://github.com/samihalawa/macos-optimizer/assets/3243470/572a7853-4752-4072-bd1d-bbec231ebcb2">
+使用 Bash 脚本的传统命令行界面 (`cli/src/script.sh`)，适合：
+- 服务器环境
+- 终端用户
+- 自动化脚本
+- 远程管理
 
-## 它能做什么？
+### 图形界面版本
+![图形界面截图](../images/gui-screenshot.png)
+
+使用 Python 和 NiceGUI 构建的现代图形界面 (`gui/src/python-app-nicegui.py`)，适合：
+- 桌面用户
+- 可视化反馈
+- 实时监控
+- 用户友好控制
+
+## 功能特点
 
 这些脚本涵盖了一系列优化功能，包括：
 
@@ -33,12 +47,13 @@
 
 3. 使脚本可执行：
    ```bash
-   chmod +x macos_optimizer.sh
+   cd cli/src
+   chmod +x script.sh
    ```
 
 4. 运行脚本：
    ```bash
-   ./macos_optimizer.sh
+   ./script.sh
    ```
 
 按照屏幕上的提示选择并应用最适合您需求的优化。

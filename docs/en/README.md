@@ -1,26 +1,6 @@
-# macOS Optimizer
+# macOS Optimizer Monorepo
 
-A powerful tool to optimize and enhance your macOS experience, available in both CLI and GUI versions.
-
-## Two Powerful Interfaces
-
-### Command Line Interface
-![CLI Screenshot](docs/images/cli-screenshot.png)
-
-A traditional command-line interface using Bash scripts (`cli/src/script.sh`), perfect for:
-- Server environments
-- Terminal power users
-- Automation scripts
-- Remote administration
-
-### Graphical Interface
-![GUI Screenshot](docs/images/gui-screenshot.png)
-
-A modern graphical interface built with Python and NiceGUI (`gui/src/python-app-nicegui.py`), ideal for:
-- Desktop users
-- Visual feedback
-- Real-time monitoring
-- User-friendly controls
+<img width="100%" alt="Screenshot" src="https://github.com/samihalawa/mac-megaoptimizer/assets/3243470/77941cba-e4dd-4b42-9092-7cc82d1ce046">
 
 ## Project Structure
 

@@ -1,12 +1,26 @@
 # macOS Optimizer: La 2ª Juventud de tu Mac
 
-<img width="100%" alt="Captura de pantalla 1" src="https://github.com/samihalawa/mac-megaoptimizer/assets/3243470/77941cba-e4dd-4b42-9092-7cc82d1ce046">
+Una potente herramienta para optimizar y mejorar tu experiencia en macOS, disponible en versión CLI y GUI.
 
-## Propósito
+## Dos Versiones
 
-El Optimizador de macOS proporciona una serie de scripts Bash diseñados para optimizar y ajustar sistemas macOS. Estos scripts buscan mejorar el rendimiento y la eficiencia ajustando diversas configuraciones del sistema.
+### Versión CLI
+![Captura CLI](../images/cli-screenshot.png)
 
-<img width="100%" alt="Captura de pantalla 2" src="https://github.com/samihalawa/macos-optimizer/assets/3243470/572a7853-4752-4072-bd1d-bbec231ebcb2">
+Una interfaz tradicional de línea de comandos usando scripts Bash (`cli/src/script.sh`), perfecta para:
+- Entornos de servidor
+- Usuarios avanzados de terminal
+- Scripts de automatización
+- Administración remota
+
+### Versión GUI
+![Captura GUI](../images/gui-screenshot.png)
+
+Una interfaz gráfica moderna construida con Python y NiceGUI (`gui/src/python-app-nicegui.py`), ideal para:
+- Usuarios de escritorio
+- Retroalimentación visual
+- Monitoreo en tiempo real
+- Controles amigables
 
 ## Características Clave
 
@@ -29,12 +43,13 @@ El Optimizador de macOS proporciona una serie de scripts Bash diseñados para op
 
 3. **Hacer el Script Ejecutable**:
    ```bash
-   chmod +x macos_optimizer.sh
+   cd cli/src
+   chmod +x script.sh
    ```
 
 4. **Ejecutar el Script**:
    ```bash
-   ./macos_optimizer.sh
+   ./script.sh
    ```
 
 Sigue las indicaciones en pantalla para seleccionar y aplicar las optimizaciones deseadas.
