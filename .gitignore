@@ -1,2 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# IDE / editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
 .aider*
+
+# Environment and secrets
 .env
+.env.*
+!.env.example
+
+# Logs and runtime
+*.log
+logs/
+.cache/
+.nicegui/
+__nicegui_*/
+
+# Backups and local optimizer state (never commit user machine state)
+*.bak
+*.backup
+.mac_optimizer/
+
+# Screenshots / temp captures at repo root
+/ui*.png
+/nicegui_screenshot.png
+/example_screenshot.png
+截屏*.png
+
+# OS
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Test / coverage artifacts
+.coverage.*
+coverage.xml
+*.cover

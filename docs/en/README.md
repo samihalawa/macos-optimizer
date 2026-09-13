@@ -1,78 +1,64 @@
-# macOS Optimizer Monorepo
+# macOS Optimizer — English Guide
 
-<img width="100%" alt="Screenshot" src="https://github.com/samihalawa/mac-megaoptimizer/assets/3243470/77941cba-e4dd-4b42-9092-7cc82d1ce046">
+<img width="100%" alt="GUI screenshot" src="../images/gui-screenshot.png" />
 
-## Project Structure
+## Overview
 
-This monorepo contains two main implementations of the macOS Optimizer:
+macOS Optimizer provides:
 
-```
-macos-optimizer/
-├── cli/                  # Command-line interface version
-│   ├── src/             # CLI source code
-│   └── README.md        # CLI-specific documentation
-├── gui/                 # Graphical interface version
-│   ├── src/            # GUI source code
-│   └── README.md       # GUI-specific documentation
-├── docs/               # Documentation
-│   ├── en/            # English documentation
-│   ├── es/            # Spanish documentation
-│   └── zh/            # Chinese documentation
-├── tests/             # Test suites
-├── config/            # Shared configuration files
-└── README.md          # This file
-```
+1. **CLI** — `cli/src/macos-optimizer.sh` interactive terminal menu  
+2. **GUI** — `gui/src/app.py` NiceGUI dashboard on `http://127.0.0.1:8080`
 
-## Versions
+Both share the philosophy of **backup-first**, **explainable** tweaks with no telemetry.
 
-### CLI Version (`cli/`)
-A traditional command-line interface using Bash scripts, perfect for:
-- Server environments
-- Terminal power users
-- Automation scripts
-- Remote administration
+## Quick start
 
-### GUI Version (`gui/`)
-A modern graphical interface built with Python and NiceGUI, ideal for:
-- Desktop users
-- Visual feedback
-- Real-time monitoring
-- User-friendly controls
+### CLI
 
-## Quick Start
-
-### Prerequisites
-- macOS 10.15 (Catalina) or later
-- For GUI version: Python 3.7+ and pip
-
-### CLI Version
 ```bash
-cd cli
-chmod +x src/script.sh
-./src/script.sh
+chmod +x cli/src/macos-optimizer.sh
+./cli/src/macos-optimizer.sh
 ```
 
-### GUI Version
+### GUI
+
 ```bash
-cd gui
+cd gui && python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-python src/python-app-nicegui.py
+python src/app.py
 ```
 
-## Documentation
+## Optimization categories
 
-- [English Documentation](docs/en/README.md)
-- [Documentación en Español](docs/es/README.md)
-- [中文文档](docs/zh/README.md)
+| Category | Typical changes | Reversible |
+|---|---|---|
+| Performance | Animation / responsiveness prefs; optional high-perf power mode | Mostly yes |
+| Graphics | Transparency, motion, Dock animation timing | Yes (`defaults`) |
+| Display | Font smoothing related preferences | Yes |
+| Storage | User caches (selected), old logs | Partial |
+| Network | TCP-related `sysctl` values | Often resets on reboot |
 
-## Contributing
+## Data locations
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to either version of the project.
+| Path | Purpose |
+|---|---|
+| `~/.mac_optimizer/backups/` | Preference exports |
+| `~/.mac_optimizer/logs/` | GUI / tooling logs |
+| `~/.mac_optimizer/profiles/` | Optional profiles |
+
+## Safety checklist
+
+1. Time Machine (or clone) backup  
+2. Built-in **Backup** action  
+3. Apply one category and validate for a day  
+4. Only then consider **Run All**
+
+## Languages
+
+- [English](README.md)
+- [Español](../es/README.md)
+- [中文](../zh/README.md)
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-Special thanks to all contributors who have helped shape both versions of macOS Optimizer.
+MIT — see the repository root `LICENSE`.

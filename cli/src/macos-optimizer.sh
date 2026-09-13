@@ -1,24 +1,33 @@
 #!/bin/bash
-# Copyright (c) 2024 Sami Halawa
+# Copyright (c) 2024-2026 Sami Halawa
 # Licensed under the MIT License (see LICENSE file for details)
 
 # Exit immediately if a command exits with a non-zero status
 set +e
 
 # Constants and Configuration
-readonly VERSION="2.1"
+readonly VERSION="2.2.0"
 readonly BASE_DIR="$HOME/.mac_optimizer"
-readonly BACKUP_DIR="$BASE_DIR/backups/$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$BACKUP_DIR"
-readonly LOG_FILE="$BACKUP_DIR/optimizer.log"
 readonly SETTINGS_FILE="$BASE_DIR/settings"
 readonly MIN_MACOS_VERSION="10.15" # Minimum supported macOS version (Catalina)
 readonly PROFILES_DIR="$BASE_DIR/profiles"
-readonly MEASUREMENTS_FILE="$BACKUP_DIR/performance_measurements.txt"
 readonly SCHEDULE_FILE="$BASE_DIR/schedule"
 readonly USAGE_PROFILE="$BASE_DIR/usage"
 readonly AUTO_BACKUP_LIMIT=5
 readonly LAST_RUN_FILE="$BASE_DIR/lastrun"
+
+# Session paths are initialized lazily so --help/--version do not write to disk.
+BACKUP_DIR=""
+LOG_FILE=""
+MEASUREMENTS_FILE=""
+
+function init_session_paths() {
+    mkdir -p "$BASE_DIR" "$PROFILES_DIR"
+    BACKUP_DIR="$BASE_DIR/backups/$(date +%Y%m%d_%H%M%S)"
+    mkdir -p "$BACKUP_DIR"
+    LOG_FILE="$BACKUP_DIR/optimizer.log"
+    MEASUREMENTS_FILE="$BACKUP_DIR/performance_measurements.txt"
+}
 readonly TRACKED_DOMAINS=(
     "com.apple.dock"
     "com.apple.finder"
@@ -27,11 +36,8 @@ readonly TRACKED_DOMAINS=(
     "com.apple.QuickLookUI"
     "NSGlobalDomain"
 )
-if ! command -v system_profiler &> /dev/null; then
-    echo "system_profiler command not found. This script requires macOS." >&2
-    exit 1
-fi
-readonly GPU_INFO=$(system_profiler SPDisplaysDataType 2>/dev/null || echo "")
+# GPU info is populated later on macOS; allow --help/--version on any host.
+GPU_INFO=""
 
 # Constants for special characters
 readonly CHECK_MARK="✓"
@@ -53,20 +59,27 @@ declare -r BOLD='\033[1m'
 declare -r DIM='\033[2m'
 declare -r UNDERLINE='\033[4m'
 
-# Enhanced system detection
+# Enhanced system detection (safe on non-macOS for help/version flags)
 ARCH=$(uname -m)
 IS_APPLE_SILICON=false
 IS_ROSETTA=false
-MACOS_VERSION=$(sw_vers -productVersion | sed 's/[a-zA-Z]//g')
-MACOS_BUILD=$(sw_vers -buildVersion)
+IS_MACOS=false
+MACOS_VERSION="unknown"
+MACOS_BUILD="unknown"
 
-if [[ "$ARCH" == "arm64" ]]; then
-    IS_APPLE_SILICON=true
-elif [[ "$ARCH" == "x86_64" ]]; then
-    # Check if running under Rosetta
-    if sysctl -n sysctl.proc_translated >/dev/null 2>&1; then
-        IS_ROSETTA=true
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    IS_MACOS=true
+    MACOS_VERSION=$(sw_vers -productVersion 2>/dev/null | sed 's/[a-zA-Z]//g')
+    MACOS_BUILD=$(sw_vers -buildVersion 2>/dev/null)
+    GPU_INFO=$(system_profiler SPDisplaysDataType 2>/dev/null || echo "")
+    if [[ "$ARCH" == "arm64" ]]; then
         IS_APPLE_SILICON=true
+    elif [[ "$ARCH" == "x86_64" ]]; then
+        # Check if running under Rosetta
+        if sysctl -n sysctl.proc_translated >/dev/null 2>&1; then
+            IS_ROSETTA=true
+            IS_APPLE_SILICON=true
+        fi
     fi
 fi
 
@@ -1783,7 +1796,7 @@ function run_remaining_optimizations() {
 function show_beautiful_menu() {
     while true; do
         clear
-        # Compact Logo with updated title
+        # Beautiful ASCII Logo
         echo -e "${CYAN}"
         echo "╔════════════════════════════════════════════════════════════╗"
         echo "║  ███╗   ███╗ █████╗  ██████╗ ██████╗ ███████╗            ║"
@@ -1796,7 +1809,7 @@ function show_beautiful_menu() {
         echo "╚════════════════════════════════════════════════════════════╝"
         echo -e "${DIM}github.com/samihalawa/macos-optimizer${NC}"
 
-        # Compact System Dashboard with fixed color codes
+        # System Status Dashboard
         echo -e "\n${DIM}╭─ System Status ─────────────────────────────────────────────╮"
         local cpu_usage=$(top -l 1 | grep "CPU usage" | cut -d: -f2 | cut -d',' -f1 | xargs)
         local mem_usage=$(memory_pressure | cut -d: -f2 | cut -d'%' -f1 | xargs)
@@ -1807,7 +1820,7 @@ function show_beautiful_menu() {
             "$(sw_vers -productVersion)" "$storage_free"
         echo -e "${DIM}╰──────────────────────────────────────────────────────────────╯${NC}"
 
-        # Menu with status indicators
+        # Menu Options
         echo -e "\n${BOLD}${PURPLE}Select Optimization:${NC} ${DIM}[↑/↓] Navigate  [Enter] Select  [Q] Quit${NC}\n"
         
         local options=(
@@ -1893,8 +1906,83 @@ function run_all_optimizations() {
     read -n 1
 }
 
+
+function show_help() {
+    cat <<EOF
+macOS Optimizer v${VERSION}
+
+Usage: $(basename "$0") [options]
+
+Options:
+  -h, --help       Show this help message and exit
+  -v, --version    Print version and exit
+  -i, --info       Print system information and exit
+  --check          Run system requirement checks and exit
+
+Interactive mode (default):
+  Launch the full-screen terminal menu for optimizations, backups, and status.
+
+Examples:
+  $(basename "$0")
+  $(basename "$0") --info
+  $(basename "$0") --version
+
+Data directory: ~/.mac_optimizer
+Docs: https://github.com/samihalawa/macos-optimizer
+EOF
+}
+
+function parse_args() {
+    case "${1:-}" in
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -v|--version)
+            echo "macOS Optimizer v${VERSION}"
+            exit 0
+            ;;
+        -i|--info)
+            if [[ "$IS_MACOS" != true ]]; then
+                echo "macOS Optimizer requires macOS (Darwin)." >&2
+                exit 1
+            fi
+            init_session_paths
+            display_system_info
+            exit 0
+            ;;
+        --check)
+            if [[ "$IS_MACOS" != true ]]; then
+                echo "macOS Optimizer requires macOS (Darwin)." >&2
+                exit 1
+            fi
+            init_session_paths
+            check_system_requirements
+            exit $?
+            ;;
+        "")
+            return 0
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Try '$(basename "$0") --help' for usage." >&2
+            exit 2
+            ;;
+    esac
+}
+
 # Main execution
 function main() {
+    # Handle non-interactive flags before UI setup
+    parse_args "$@"
+
+    if [[ "$IS_MACOS" != true ]]; then
+        echo "macOS Optimizer requires macOS (Darwin). Detected: $(uname -s)" >&2
+        exit 1
+    fi
+
+    init_session_paths
+
     # Set error handling
     set +e
     trap 'cleanup_and_exit 1' INT TERM
