@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Python syntax and helper tests
+        run: |
+          python -m py_compile gui/src/app.py config/settings.py
+          python gui/src/test_app_helpers.py
+      - name: CLI help/version smoke
+        run: |
+          chmod +x cli/src/macos-optimizer.sh cli/src/script.sh
+          ./cli/src/macos-optimizer.sh --version
+          ./cli/src/macos-optimizer.sh --help >/dev/null
+          ./cli/src/script.sh --version
+      - name: Install bats and run CLI tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats
+          bats tests/cli/test_script.sh

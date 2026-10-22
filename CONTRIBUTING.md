@@ -1,81 +1,83 @@
 # Contributing to macOS Optimizer
 
-Thank you for your interest in contributing to macOS Optimizer! This document provides guidelines and instructions for contributing to both the CLI and GUI versions of the project.
+Thanks for helping improve macOS Optimizer. This guide covers both the CLI and GUI.
 
-## Project Structure
+## Project layout
 
-The project is organized as a monorepo with two main components:
-
-```
+```text
 macos-optimizer/
-├── cli/                  # Command-line interface version
-├── gui/                 # Graphical interface version
-├── docs/               # Documentation
-├── tests/             # Test suites
-└── config/            # Shared configuration files
+├── cli/src/macos-optimizer.sh   # Terminal UI + optimizations
+├── gui/src/app.py               # NiceGUI application
+├── config/                      # Shared defaults (Python + shell)
+├── docs/                        # EN / ES / ZH documentation
+└── tests/cli/                   # bats smoke tests
 ```
 
-## Development Setup
+## Development setup
 
-1. Fork and clone the repository
-2. Set up your development environment:
-   ```bash
-   # For CLI development
-   cd cli
-   chmod +x src/script.sh
-   
-   # For GUI development
-   cd gui
-   pip install -r requirements.txt
-   ```
+```bash
+git clone https://github.com/samihalawa/macos-optimizer.git
+cd macos-optimizer
 
-## Contributing Guidelines
+# CLI
+chmod +x cli/src/macos-optimizer.sh
+./cli/src/macos-optimizer.sh --help
 
-### For Both Versions
-- Follow the existing code style
-- Add tests for new features
-- Update documentation as needed
-- Keep commits atomic and messages clear
+# GUI
+make install-gui
+make gui
+```
 
-### CLI Version
-- Use shellcheck for bash script linting
-- Follow POSIX compliance where possible
-- Add error handling for all operations
+## Guidelines
 
-### GUI Version
-- Follow PEP 8 style guide
-- Use type hints
-- Keep the UI consistent with existing design
+### All contributions
+- Prefer small, focused pull requests
+- Update docs when behavior changes
+- Never commit machine state from `~/.mac_optimizer/`, logs, or secrets
+- Keep safety messaging honest (impact, sudo needs, reversibility)
+
+### CLI (`cli/`)
+- Target bash suitable for macOS `/bin/bash` and newer bash when available
+- Run `shellcheck -x cli/src/macos-optimizer.sh` when possible
+- Preserve `--help` / `--version` without requiring macOS APIs beyond detection
+- Avoid destructive cleanup outside well-documented paths
+
+### GUI (`gui/`)
+- Python 3.9+
+- Keep runtime dependencies minimal (`gui/requirements.txt`)
+- Prefer `asyncio.to_thread` for blocking work
+- Do not bind the UI beyond localhost by default
 
 ## Testing
 
 ```bash
-# Run CLI tests
-cd tests
-./test_cli.sh
-
-# Run GUI tests
-python -m pytest tests/test_gui.py
+make test
+# or
+python3 gui/src/test_app_helpers.py
+# bats (optional)
+bats tests/cli/test_script.sh
 ```
+
+On Linux CI hosts, CLI tests should only assert `--help` / `--version` behavior. Full optimization paths require macOS.
 
 ## Documentation
 
-- Update relevant documentation in the `docs/` directory
-- Maintain documentation in all supported languages (en, es, zh)
-- Follow the existing documentation style
+- Update `README.md` for user-facing changes
+- Keep `docs/en`, `docs/es`, and `docs/zh` roughly in sync for major features
+- Add a `CHANGELOG.md` entry under **Unreleased** or the next version
 
-## Pull Request Process
+## Pull requests
 
-1. Create a feature branch
-2. Make your changes
-3. Run tests
-4. Update documentation
-5. Submit a pull request
+1. Branch from the default branch
+2. Make the change + tests/docs
+3. Run `make test` (and `make lint` if tools are available)
+4. Open a PR with a clear summary and test notes
+5. Link related issues
 
 ## Code of Conduct
 
-Please note that this project is released with a Contributor Code of Conduct. By participating in this project you agree to abide by its terms.
+Participation is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-## Questions?
+## Questions
 
-Feel free to open an issue for any questions about contributing. 
+Open a GitHub issue with the `question` label.

@@ -1,59 +1,44 @@
 # macOS Optimizer GUI
 
-The graphical interface version of macOS Optimizer, built with Python and NiceGUI.
+Modern local web UI built with [NiceGUI](https://nicegui.io/), wrapping the same optimization ideas as the CLI.
+
+## Requirements
+
+- Python **3.9+**
+- macOS for applying system tweaks (UI can start in preview mode elsewhere)
+
+## Setup
+
+```bash
+cd gui
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python src/app.py
+```
+
+Open [http://127.0.0.1:8080](http://127.0.0.1:8080).
+
+Or from the repo root: `make gui`.
 
 ## Features
 
-- Modern web-based interface
-- Real-time system monitoring
-- Visual progress tracking
-- User-friendly controls
-- Interactive optimization process
+- Dashboard with CPU / memory / disk snapshots (`psutil`)
+- One-click optimizations with automatic preference backups
+- Activity feed + persistent logs in `~/.mac_optimizer/logs/gui.log`
+- Localhost-only bind by default
 
-## Prerequisites
+## Configuration
 
-- Python 3.7+
-- pip (Python package manager)
+See [`../config/settings.py`](../config/settings.py) for port, paths, and category metadata.
 
-## Installation
+## Development dependencies
 
-1. Make sure you're in the GUI directory:
-   ```bash
-   cd gui
-   ```
-
-2. Install required packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. Run the application:
-   ```bash
-   python src/python-app-nicegui.py
-   ```
-
-4. Open your web browser and navigate to:
-   ```
-   http://localhost:8080
-   ```
-
-## Available Optimizations
-
-- System performance tuning
-- Network optimization
-- Power management
-- Storage cleanup
-- Real-time monitoring
-- Visual feedback
-- And more...
-
-## Development
-
-The GUI is built using:
-- NiceGUI for the interface
-- Python for backend logic
-- Modern web technologies
+```bash
+pip install -r requirements-dev.txt
+python src/test_app_helpers.py
+```
 
 ## Contributing
 
-Please read the main [CONTRIBUTING.md](../CONTRIBUTING.md) file for guidelines. 
+See [CONTRIBUTING.md](../CONTRIBUTING.md).
